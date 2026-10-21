@@ -114,6 +114,16 @@
         let recognition = null;
         let pendingVitalData = null;
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function speak(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
@@ -154,31 +164,38 @@
                     ? 'bg-slate-400 text-white cursor-not-allowed' 
                     : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xl';
                 const btnText = isTaken 
-                    ? `<i class="fa-solid fa-check-double text-3xl mr-2"></i> ĐÃ UỐNG LÚC ${m.taken_time || 'HÔM NAY'}`
+                    ? `<i class="fa-solid fa-check-double text-3xl mr-2"></i> ĐÃ UỐNG LÚC ${escapeHtml(m.taken_time || 'HÔM NAY')}`
                     : `<i class="fa-solid fa-circle-check text-4xl mr-2"></i> BÀ ĐÃ UỐNG VIÊN NÀY`;
 
+                const safeMedId = escapeHtml(m.medication_id);
+                const safeName = escapeHtml(m.medicine_name);
+                const safeDosage = escapeHtml(m.dosage);
+                const safeShape = escapeHtml(m.pill_color_shape || 'Viên thuốc');
+                const safeInst = escapeHtml(m.instructions || 'Uống theo đơn');
+                const safeTime = escapeHtml(m.schedule_times && m.schedule_times.length > 0 ? m.schedule_times[0] : 'Trong ngày');
+
                 html += `
-                    <div class="rounded-3xl p-6 border-4 ${borderClass} shadow-lg text-center transition" id="card-${m.medication_id}">
+                    <div class="rounded-3xl p-6 border-4 ${borderClass} shadow-lg text-center transition" id="card-${safeMedId}">
                         <div class="flex items-center justify-between mb-2">
                             <span class="inline-block bg-amber-200 text-amber-900 text-xl font-bold px-4 py-1.5 rounded-full">
-                                ⏰ Cữ thuốc ${m.schedule_times ? m.schedule_times[0] : 'Trong ngày'}
+                                ⏰ Cữ thuốc ${safeTime}
                             </span>
                             ${isTaken 
                                 ? '<span class="text-emerald-700 font-bold text-lg"><i class="fa-solid fa-circle-check"></i> Đã hoàn thành</span>' 
                                 : '<span class="text-amber-800 font-bold text-lg animate-pulse"><i class="fa-solid fa-clock"></i> Chưa uống</span>'}
                         </div>
                         <h2 class="text-elderly-title font-bold text-amber-950 mb-1">
-                            ${m.medicine_name}
+                            ${safeName}
                         </h2>
                         <p class="text-elderly-body text-amber-900 mb-5">
-                            👉 ${m.dosage} - ${m.pill_color_shape || 'Viên thuốc'} (${m.instructions || 'Uống theo đơn'})
+                            👉 ${safeDosage} - ${safeShape} (${safeInst})
                         </p>
-                        <button onclick="confirmTaken('${m.medication_id}', '${m.medicine_name}')" ${isTaken ? 'disabled' : ''} class="w-full ${btnClass} text-elderly-btn py-5 rounded-2xl flex items-center justify-center transition" id="btnTake-${m.medication_id}">
+                        <button onclick="confirmTaken('${safeMedId}', '${safeName}')" ${isTaken ? 'disabled' : ''} class="w-full ${btnClass} text-elderly-btn py-5 rounded-2xl flex items-center justify-center transition" id="btnTake-${safeMedId}">
                             ${btnText}
                         </button>
-                        <div id="undoBox-${m.medication_id}" class="hidden mt-3">
-                            <button onclick="undoTaken('${m.log_id}', '${m.medication_id}')" class="bg-amber-200 hover:bg-amber-300 text-amber-900 text-lg font-bold px-6 py-2 rounded-xl border border-amber-400">
-                                <i class="fa-solid fa-rotate-left mr-2"></i> Bấm nhầm? Bấm để Hoàn tác (<span id="undoCount-${m.medication_id}">15</span>s)
+                        <div id="undoBox-${safeMedId}" class="hidden mt-3">
+                            <button onclick="undoTaken('${escapeHtml(m.log_id)}', '${safeMedId}')" class="bg-amber-200 hover:bg-amber-300 text-amber-900 text-lg font-bold px-6 py-2 rounded-xl border border-amber-400">
+                                <i class="fa-solid fa-rotate-left mr-2"></i> Bấm nhầm? Bấm để Hoàn tác (<span id="undoCount-${safeMedId}">15</span>s)
                             </button>
                         </div>
                     </div>
@@ -204,7 +221,7 @@
 
                 await loadTodayMedications();
 
-                if (data.log_id) {
+                if (data.log_id && !data.already_taken) {
                     showUndoButton(data.log_id, medId);
                 }
             } catch (e) {
@@ -307,43 +324,74 @@
             document.getElementById('btnVoice').classList.replace('bg-rose-600', 'bg-blue-600');
             document.getElementById('micText').innerText = "BẤM VÀO ĐÂY ĐỂ NÓI";
             document.getElementById('micIcon').className = "fa-solid fa-microphone text-4xl";
-            if (recognition) recognition.stop();
+            if (recognition) {
+                try { recognition.stop(); } catch(e){}
+            }
         }
 
         async function handleVoiceCommand(text) {
             document.getElementById('aiSpeechText').innerText = `Cụ vừa nói: "${text}"`;
-            const lowerText = text.toLowerCase();
+            const lowerText = text.toLowerCase().trim();
 
-            // Nếu cụ nói "Đúng rồi", "Chuẩn rồi" khi đang ở bước xác nhận
-            if (pendingVitalData && (lowerText.includes("đúng") || lowerText.includes("phải") || lowerText.includes("chuẩn") || lowerText.includes("xác nhận") || lowerText.includes("ok"))) {
-                acceptBpLog();
-                return;
-            }
-
-            // Nếu cụ nói "Sai rồi", "Đọc lại"
-            if (pendingVitalData && (lowerText.includes("sai") || lowerText.includes("nhầm") || lowerText.includes("đọc lại") || lowerText.includes("không phải"))) {
-                cancelBpLog();
-                return;
-            }
-
-            // Nếu cụ nói đã uống thuốc
-            if (lowerText.includes("uống rồi") || lowerText.includes("đã uống") || lowerText.includes("xong rồi")) {
-                const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/today`);
-                const meds = await res.json();
-                const pendingMed = meds.find(m => !m.is_taken) || meds[0];
-                if (pendingMed) {
-                    confirmTaken(pendingMed.medication_id, pendingMed.medicine_name);
-                }
-                return;
-            }
-
-            // Nếu cụ nói kêu cứu, khó thở, đau ngực
-            if (lowerText.includes("cấp cứu") || lowerText.includes("cứu") || lowerText.includes("đau ngực") || lowerText.includes("khó thở") || lowerText.includes("ngã")) {
+            // =========================================================================
+            // ƯU TIÊN 1: PHÁT HIỆN TÍN HIỆU CẤP CỨU SOS ĐẦU TIÊN (TRÁNH BỊ CHE BỞI CÁC CÂU LỆNH KHÁC)
+            // =========================================================================
+            const sosRegex = /\b(cấp cứu|cứu tôi|cứu với|cứu con|cứu bà|cứu ông|đau ngực|tức ngực|khó thở|chóng mặt|ngất|bị ngã|ngã rồi|mệt lả|mệt quá)\b/;
+            if (sosRegex.test(lowerText) || (lowerText.includes("cứu") && !lowerText.includes("nghiên cứu"))) {
                 triggerSosEmergency();
                 return;
             }
 
-            // Mặc định: Phân tích huyết áp
+            // =========================================================================
+            // ƯU TIÊN 2: XỬ LÝ PHẢN HỒI XÁC NHẬN HUYẾT ÁP (KIỂM TRA TỪ CHỐI TRƯỚC, ĐỒNG Ý SAU)
+            // =========================================================================
+            if (pendingVitalData) {
+                // Kiểm tra nhánh TỪ CHỐI / HỦY BỎ trước để tránh "không phải", "không đúng" bị nhầm là xác nhận
+                const isRejection = lowerText.includes("không") || lowerText.includes("sai") || 
+                                    lowerText.includes("nhầm") || lowerText.includes("đọc lại") || 
+                                    lowerText.includes("chưa đúng");
+                if (isRejection) {
+                    cancelBpLog();
+                    return;
+                }
+
+                // Kiểm tra nhánh XÁC NHẬN (chỉ khi không chứa từ phủ định)
+                const isConfirmation = !lowerText.includes("không") && (
+                    lowerText.includes("đúng rồi") || lowerText.includes("phải rồi") || 
+                    lowerText.includes("chuẩn rồi") || lowerText.includes("xác nhận") || 
+                    lowerText.includes("chính xác") || lowerText.includes("đúng") || 
+                    lowerText.includes("phải") || lowerText.includes("ok")
+                );
+                if (isConfirmation) {
+                    acceptBpLog();
+                    return;
+                }
+            }
+
+            // =========================================================================
+            // ƯU TIÊN 3: CỤ BÁO ĐÃ UỐNG THUỐC
+            // =========================================================================
+            if (lowerText.includes("uống rồi") || lowerText.includes("đã uống") || lowerText.includes("xong rồi")) {
+                try {
+                    const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/today`);
+                    const meds = await res.json();
+                    const pendingMed = meds.find(m => !m.is_taken);
+                    if (pendingMed) {
+                        confirmTaken(pendingMed.medication_id, pendingMed.medicine_name);
+                    } else {
+                        const msg = "Dạ thưa cụ, toàn bộ các cữ thuốc hôm nay cụ đều đã uống đủ rồi ạ!";
+                        document.getElementById('aiSpeechText').innerText = msg;
+                        speak(msg);
+                    }
+                } catch(e) {
+                    console.log("Error checking today meds:", e);
+                }
+                return;
+            }
+
+            // =========================================================================
+            // ƯU TIÊN 4: MẶC ĐỊNH BÓC TÁCH HUYẾT ÁP & NHỊP TIM
+            // =========================================================================
             try {
                 const res = await fetch(`${API_BASE}/elderly/vitals/parse-voice`, {
                     method: "POST",
@@ -375,6 +423,7 @@
                     speak(data.message);
                 }
             } catch (err) {
+                // Rule 5: Graceful Fallback
                 const fallback = "Dạ con đã nghe lời cụ dặn rồi ạ!";
                 document.getElementById('aiSpeechText').innerText = fallback;
                 speak(fallback);
@@ -410,10 +459,11 @@
             speak(msg);
         }
 
-        // KẾT NỐI WEBSOCKET THỜI GIAN THỰC ĐỂ NHẬN LỆNH TỰ ĐỘNG
+        // KẾT NỐI WEBSOCKET THỜI GIAN THỰC ĐỂ NHẬN LỆNH TỰ ĐỘNG THEO ELDERLY_ID
         function initWebSocket() {
             const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const ws = new WebSocket(`${wsProtocol}//localhost:8000/ws`);
+            const wsHost = window.location.hostname || "localhost";
+            const ws = new WebSocket(`${wsProtocol}//${wsHost}:8000/ws?elderly_id=${elderlyId}`);
 
             ws.onmessage = (event) => {
                 try {

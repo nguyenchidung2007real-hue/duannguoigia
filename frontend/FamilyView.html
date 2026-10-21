@@ -41,7 +41,7 @@
                 <div>
                     <div class="flex items-center space-x-3">
                         <h2 class="text-2xl font-bold text-slate-900" id="profileName">Bà Nguyễn Thị Lan</h2>
-                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Năm sinh: 1952 (74 tuổi)</span>
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full" id="profileAge">Năm sinh: 1952</span>
                     </div>
                     <p class="text-sm text-slate-600 mt-1" id="profileHistory">Bệnh nền: Tăng huyết áp vô căn, thoái hóa khớp gối nhẹ</p>
                 </div>
@@ -131,7 +131,7 @@
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-100">
                     <div class="flex items-center space-x-3">
                         <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                        <span class="text-sm font-medium text-slate-700">Khởi tạo phiên giám sát cho Bà Nguyễn Thị Lan</span>
+                        <span class="text-sm font-medium text-slate-700">Khởi tạo phiên giám sát người thân</span>
                     </div>
                     <span class="text-xs text-slate-400">Vừa xong</span>
                 </div>
@@ -142,11 +142,24 @@
 
     <script>
         const API_BASE = "http://localhost:8000/api";
-        const WS_URL = "ws://localhost:8000/ws";
         const elderlyId = "lan_1952";
+        const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsHost = window.location.hostname || "localhost";
+        const WS_URL = `${wsProtocol}//${wsHost}:8000/ws?elderly_id=${elderlyId}`;
+
         let bpChartInstance = null;
         let ws = null;
         let sharedAudioCtx = null;
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         function initAudio() {
             if (!sharedAudioCtx) {
@@ -184,8 +197,12 @@
             };
 
             ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                handleRealtimeEvent(data);
+                try {
+                    const data = JSON.parse(event.data);
+                    handleRealtimeEvent(data);
+                } catch(err) {
+                    console.log("Parse websocket err:", err);
+                }
             };
 
             ws.onclose = () => {
@@ -208,9 +225,9 @@
                     <div class="flex items-center justify-between p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 animate-bounce">
                         <div class="flex items-center space-x-3">
                             <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                            <span class="text-sm font-bold text-emerald-800">✅ Cụ vừa uống thuốc: ${event.medicine_name}</span>
+                            <span class="text-sm font-bold text-emerald-800">✅ Cụ vừa uống thuốc: ${escapeHtml(event.medicine_name)}</span>
                         </div>
-                        <span class="text-xs text-emerald-600 font-semibold">${event.time}</span>
+                        <span class="text-xs text-emerald-600 font-semibold">${escapeHtml(event.time)}</span>
                     </div>
                 `;
                 playNotificationSound();
@@ -221,7 +238,7 @@
                             <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                             <span class="text-sm font-bold text-amber-800">↩️ Cụ vừa bấm hoàn tác xác nhận uống thuốc</span>
                         </div>
-                        <span class="text-xs text-amber-600 font-semibold">${event.time || 'Vừa xong'}</span>
+                        <span class="text-xs text-amber-600 font-semibold">${escapeHtml(event.time || 'Vừa xong')}</span>
                     </div>
                 `;
                 playNotificationSound();
@@ -230,9 +247,9 @@
                     <div class="flex items-center justify-between p-4 bg-rose-100 rounded-2xl border-2 border-rose-500 animate-pulse shadow-lg">
                         <div class="flex items-center space-x-3">
                             <span class="w-3.5 h-3.5 rounded-full bg-rose-600 animate-ping"></span>
-                            <span class="text-base font-black text-rose-900">${event.message} (${event.location || 'Tại nhà'})</span>
+                            <span class="text-base font-black text-rose-900">${escapeHtml(event.message)} (${escapeHtml(event.location || 'Tại nhà')})</span>
                         </div>
-                        <span class="text-xs font-bold text-rose-700">${event.time}</span>
+                        <span class="text-xs font-bold text-rose-700">${escapeHtml(event.time)}</span>
                     </div>
                 `;
                 playNotificationSound();
@@ -241,9 +258,9 @@
                     <div class="flex items-center justify-between p-3.5 bg-amber-100 rounded-xl border border-amber-400 animate-pulse">
                         <div class="flex items-center space-x-3">
                             <span class="w-2.5 h-2.5 rounded-full bg-amber-600"></span>
-                            <span class="text-sm font-bold text-amber-900">⚠️ ${event.message}</span>
+                            <span class="text-sm font-bold text-amber-900">⚠️ ${escapeHtml(event.message)}</span>
                         </div>
-                        <span class="text-xs text-amber-700">${event.time || ''}</span>
+                        <span class="text-xs text-amber-700">${escapeHtml(event.time || '')}</span>
                     </div>
                 `;
                 playNotificationSound();
@@ -252,9 +269,9 @@
                     <div class="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-200">
                         <div class="flex items-center space-x-3">
                             <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                            <span class="text-sm font-semibold text-blue-800">⏰ Hệ thống vừa nhắc Cụ uống thuốc: ${event.medicine_name} (Lần ${event.reminder_count})</span>
+                            <span class="text-sm font-semibold text-blue-800">⏰ Hệ thống vừa nhắc Cụ uống thuốc: ${escapeHtml(event.medicine_name)} (Lần ${event.reminder_count})</span>
                         </div>
-                        <span class="text-xs text-slate-500">${event.time}</span>
+                        <span class="text-xs text-slate-500">${escapeHtml(event.time)}</span>
                     </div>
                 `;
             } else if (event.event === "VITAL_LOGGED") {
@@ -267,9 +284,9 @@
                     <div class="flex items-center justify-between p-3.5 ${bgClass} rounded-xl border ${isDanger ? 'animate-pulse' : ''}">
                         <div class="flex items-center space-x-3">
                             <span class="w-2.5 h-2.5 rounded-full ${dotClass}"></span>
-                            <span class="text-sm font-bold ${textClass}">🩺 Cụ vừa đo huyết áp: ${event.systolic}/${event.diastolic} mmHg (${event.title})</span>
+                            <span class="text-sm font-bold ${textClass}">🩺 Cụ vừa đo huyết áp: ${event.systolic}/${event.diastolic} mmHg (${escapeHtml(event.title)})</span>
                         </div>
-                        <span class="text-xs text-slate-500">${event.time}</span>
+                        <span class="text-xs text-slate-500">${escapeHtml(event.time)}</span>
                     </div>
                 `;
                 playNotificationSound();
@@ -286,6 +303,13 @@
             try {
                 const sumRes = await fetch(`${API_BASE}/family/summary/${elderlyId}`);
                 const sumData = await sumRes.json();
+
+                if (sumData.profile) {
+                    document.getElementById('profileName').innerText = sumData.profile.full_name;
+                    document.getElementById('profileAge').innerText = `Năm sinh: ${sumData.profile.birth_year}`;
+                    document.getElementById('profileHistory').innerText = `Bệnh nền: ${sumData.profile.medical_history || 'Bình thường'}`;
+                    document.getElementById('profilePairingCode').innerText = sumData.profile.pairing_code;
+                }
 
                 // Cập nhật thẻ Huyết áp (Hỗ trợ bắt chuẩn cả CRITICAL, STAGE, LOW và MIXED_DANGER)
                 if (sumData.latest_vital && sumData.latest_vital.systolic) {

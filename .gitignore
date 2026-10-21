@@ -8,6 +8,7 @@ venv/
 .venv/
 elderly_care.db
 *.sqlite3
+*.zip
 .DS_Store
 .vscode/
 .idea/

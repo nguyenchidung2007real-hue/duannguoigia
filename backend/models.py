@@ -6,9 +6,12 @@ from database import Base
 
 VN_TIMEZONE = timezone(timedelta(hours=7))
 
-def get_vn_now():
-    """Hàm lấy thời gian hiện tại theo múi giờ chuẩn Việt Nam (UTC+7)"""
-    return datetime.now(VN_TIMEZONE)
+def get_vn_now() -> datetime:
+    """
+    Trả về datetime naive (không tzinfo) chuẩn theo giờ Việt Nam (UTC+7).
+    Tương thích 100% với SQLite, so sánh không bị lỗi TypeError và chạy chuẩn trên mọi server đám mây.
+    """
+    return datetime.now(timezone.utc).astimezone(VN_TIMEZONE).replace(tzinfo=None)
 
 def generate_uuid():
     return str(uuid.uuid4())

@@ -70,3 +70,9 @@ class VitalSignResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# Schema gửi tín hiệu cứu hộ từ mã QR công cộng
+class QrAlertRequest(BaseModel):
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    helper_note: Optional[str] = None
