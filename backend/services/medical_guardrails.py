@@ -43,7 +43,9 @@ def preprocess_voice_text(text: str) -> str:
 
     # Đổi "rưỡi" thành ".5"
     t = re.sub(r'(\d+)\s*rưỡi', r'\1.5', t)
-    # Đổi dấu phẩy thập phân thành dấu chấm ("13,5" -> "13.5")
+    # Đổi dấu phẩy thập phân thành dấu chấm ("13,5" -> "13.5", "13 phẩy 5" -> "13.5", "13 phẩy năm" -> "13.5")
+    t = re.sub(r'(\d+)\s*phẩy\s*năm\b', r'\1.5', t)
+    t = re.sub(r'(\d+)\s*phẩy\s*(\d+)', r'\1.\2', t)
     t = re.sub(r'(\d+),(\d+)', r'\1.\2', t)
     # Chỉ gộp khi số đằng sau là số 5 (Ví dụ: "13 5" -> "13.5", nhưng "13 8" giữ nguyên "13 8")
     t = re.sub(r'(\b(?:1[0-9]|2[0-2]|[6-9]))\s+(5\b)', r'\1.\2', t)
@@ -62,13 +64,20 @@ def evaluate_blood_pressure(systolic: float, diastolic: float, pulse: float = No
     diastolic = normalize_bp_value(diastolic)
 
     if systolic is None or diastolic is None:
+        if systolic and not diastolic:
+            missing_msg = f"Dạ con mới chỉ nghe được một chỉ số huyết áp ({systolic}). Cụ đọc lại đủ cả hai số, số trên và số dưới giúp con nhé ạ!"
+        elif not systolic and diastolic:
+            missing_msg = f"Dạ con mới chỉ nghe được chỉ số tâm trương ({diastolic}). Cụ đọc lại đủ cả hai số, số trên và số dưới giúp con nhé ạ!"
+        else:
+            missing_msg = "Dạ con chưa nhận đủ hai chỉ số huyết áp. Cụ đọc lại ví dụ '130 trên 80' hoặc '13 trên 8' giúp con nhé ạ!"
+
         return {
             "category": "INVALID",
             "severity_level": 0,
             "title": "Thiếu chỉ số",
             "systolic": systolic,
             "diastolic": diastolic,
-            "advice": "Dạ con chưa nhận đủ hai chỉ số huyết áp. Cụ đọc lại ví dụ '130 trên 80' hoặc '13 trên 8' giúp con nhé ạ!"
+            "advice": missing_msg
         }
 
     if systolic <= diastolic:

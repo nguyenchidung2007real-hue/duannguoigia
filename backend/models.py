@@ -89,7 +89,7 @@ class VitalSign(Base):
     systolic = Column(Float, nullable=False)   # Huyết áp tâm thu (VD: 135)
     diastolic = Column(Float, nullable=False)  # Huyết áp tâm trương (VD: 85)
     heart_rate = Column(Float, nullable=True)  # Nhịp tim
-    health_category = Column(String(30), nullable=False) # NORMAL, HIGH_NORMAL, STAGE_1, CRITICAL_HIGH
+    health_category = Column(String(30), nullable=False) # NORMAL, HIGH_NORMAL, HYPERTENSION_STAGE_1, HYPERTENSION_STAGE_2, CRITICAL_HIGH, HYPOTENSION_LOW, CRITICAL_LOW, MIXED_DANGER
     input_source = Column(String(30), default="VOICE_INPUT")
     raw_voice_transcript = Column(Text, nullable=True) # Câu gốc: "Huyết áp hôm nay 135 trên 85"
     measured_at = Column(DateTime, default=datetime.utcnow)

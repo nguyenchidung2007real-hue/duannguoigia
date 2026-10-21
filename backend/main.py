@@ -201,25 +201,54 @@ async def undo_take_medication(log_id: str, db: Session = Depends(get_db)):
 def extract_bp_from_text(raw_text: str):
     """
     Bóc tách số đo huyết áp sau khi đã tiền xử lý 'rưỡi', dấu phẩy, v.v.
-    Hỗ trợ cả:
+    Hỗ trợ đa dạng các kịch bản thực tế của người cao tuổi:
     - Có từ nối: '135 trên 85', '135/85', '135 và 85', '135 tâm trương 85'
-    - Đọc liền 2 số: 'huyết áp 135 85', '13 rưỡi 8 rưỡi'
-    - Bắt nhịp tim: 'nhịp tim 75', 'tim 78', 'mạch 80'
+    - Đọc theo màn hình máy đo 3 số: '120 80 75', '13 8 72' (Tâm thu, Tâm trương, Nhịp tim)
+    - Đọc liền 2 số: 'huyết áp 135 85', '13 8', '12 5 8 5' (12.5 8.5)
+    - Bắt nhịp tim riêng: 'nhịp tim 75', 'tim 78', 'mạch 80' (tách riêng để không lẫn với huyết áp)
+    - Nhận diện khi chỉ có 1 số: 'huyết áp 12 5 nhịp tim 70' -> bắt được 12.5 (125), tâm trương thiếu
     """
     clean_text = preprocess_voice_text(raw_text)
-    
-    # Ưu tiên 1: Có từ nối
-    match = re.search(r'(\d+(?:\.\d+)?)\s*(?:trên|\/|và|-|tâm trương)\s*(\d+(?:\.\d+)?)', clean_text)
-    
-    # Ưu tiên 2: Nếu cụ đọc liền 2 số cách nhau bằng khoảng trắng (VD: "huyết áp 135 85", "13 8")
-    if not match:
-        match = re.search(r'(\d{1,3}(?:\.\d+)?)\s+(\d{1,3}(?:\.\d+)?)', clean_text)
 
+    # 1. Bắt nhịp tim nếu có từ khóa tường minh và tách khỏi văn bản huyết áp
+    pulse = None
     pulse_match = re.search(r'(?:nhịp tim|tim|mạch)\s*(?:là|khoảng)?\s*(\d{2,3})', clean_text)
+    if pulse_match:
+        pulse = float(pulse_match.group(1))
+        # Loại bỏ đoạn nhịp tim để không làm nhiễu bóc tách huyết áp
+        bp_clean = clean_text[:pulse_match.start()] + ' ' + clean_text[pulse_match.end():]
+    else:
+        bp_clean = clean_text
 
-    sys_raw = float(match.group(1)) if match else None
-    dia_raw = float(match.group(2)) if match else None
-    pulse = float(pulse_match.group(1)) if pulse_match else None
+    sys_raw, dia_raw = None, None
+
+    # Ưu tiên 1: Có từ nối rõ ràng ('trên', '/', 'và', '-', 'tâm trương')
+    match_sep = re.search(r'(\d+(?:\.\d+)?)\s*(?:trên|\/|và|-|tâm trương)\s*(\d+(?:\.\d+)?)', bp_clean)
+    if match_sep:
+        sys_raw = float(match_sep.group(1))
+        dia_raw = float(match_sep.group(2))
+    else:
+        # Ưu tiên 2: Cụ đọc 3 số liên tiếp từ màn hình máy đo (VD: "120 80 75" hoặc "13 8 72")
+        match_3 = re.search(r'(\d{1,3}(?:\.\d+)?)\s+(\d{1,3}(?:\.\d+)?)\s+(\d{2,3})', bp_clean)
+        if match_3 and pulse is None:
+            sys_raw = float(match_3.group(1))
+            dia_raw = float(match_3.group(2))
+            pulse = float(match_3.group(3))
+        else:
+            # Ưu tiên 3: 2 số liên tiếp (VD: "135 85", "13 8", "12.5 8.5", "12.5 80")
+            match_2 = re.search(r'(\d{1,3}(?:\.\d+)?)\s+(\d{1,3}(?:\.\d+)?)', bp_clean)
+            if match_2:
+                sys_raw = float(match_2.group(1))
+                dia_raw = float(match_2.group(2))
+            else:
+                # Ưu tiên 4: Cụ chỉ đọc 1 số duy nhất (VD: "huyết áp 12 5" -> 12.5, "130", "tâm trương 80")
+                single_matches = re.findall(r'\b\d+(?:\.\d+)?\b', bp_clean)
+                if len(single_matches) == 1:
+                    val = float(single_matches[0])
+                    if 'tâm trương' in bp_clean or 'số dưới' in bp_clean:
+                        dia_raw = val
+                    else:
+                        sys_raw = val
 
     systolic = normalize_bp_value(sys_raw)
     diastolic = normalize_bp_value(dia_raw)
@@ -229,6 +258,21 @@ def extract_bp_from_text(raw_text: str):
 @app.post("/api/elderly/vitals/parse-voice")
 def parse_voice_vitals(data: schemas.VitalSignParseInput):
     sys_val, dia_val, pulse_val = extract_bp_from_text(data.raw_transcript)
+
+    # Xử lý các tình huống biên khi chỉ bắt được 1 số hoặc không bắt được số nào
+    if sys_val and not dia_val:
+        return {
+            "success": False,
+            "need_retry": True,
+            "message": f"Dạ con mới chỉ nghe được một chỉ số huyết áp là {sys_val}. Cụ đọc giúp con đủ cả hai số, số trên và số dưới (ví dụ '{sys_val} trên 80') nhé ạ!"
+        }
+
+    if not sys_val and dia_val:
+        return {
+            "success": False,
+            "need_retry": True,
+            "message": f"Dạ con mới chỉ nghe được chỉ số tâm trương là {dia_val}. Cụ đọc giúp con đủ cả hai số, số trên và số dưới (ví dụ '120 trên {dia_val}') nhé ạ!"
+        }
 
     if not sys_val or not dia_val:
         return {
