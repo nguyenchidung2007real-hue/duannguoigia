@@ -71,18 +71,18 @@
                 </div>
             </div>
 
-            <!-- Card 2: Tuân thủ uống thuốc -->
+            <!-- Card 2: Tuân thủ uống thuốc (CẬP NHẬT ĐỘNG TỪ STATS) -->
             <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-semibold text-slate-500">Uống thuốc hôm nay</span>
                     <i class="fa-solid fa-pills text-blue-500 text-xl"></i>
                 </div>
                 <div class="flex items-baseline space-x-2">
-                    <span class="text-4xl font-extrabold text-blue-600" id="statMedRate">100%</span>
-                    <span class="text-sm text-slate-500" id="statMedCount">(Đã uống 1/1 cữ)</span>
+                    <span class="text-4xl font-extrabold text-blue-600" id="statMedRate">0%</span>
+                    <span class="text-sm text-slate-500" id="statMedCount">(Đã uống 0/2 cữ)</span>
                 </div>
                 <div class="w-full bg-slate-100 rounded-full h-2 mt-4">
-                    <div class="bg-blue-600 h-2 rounded-full" id="statMedBar" style="width: 100%"></div>
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-500" id="statMedBar" style="width: 0%"></div>
                 </div>
             </div>
 
@@ -122,7 +122,6 @@
             </h3>
 
             <div class="space-y-3" id="liveLogsContainer">
-                <!-- Log mẫu -->
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-100">
                     <div class="flex items-center space-x-3">
                         <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
@@ -141,6 +140,33 @@
         const elderlyId = "lan_1952";
         let bpChartInstance = null;
         let ws = null;
+        let sharedAudioCtx = null;
+
+        // Tự động kích hoạt AudioContext khi người dùng chạm vào màn hình (Tránh Chrome Autoplay Policy)
+        function initAudio() {
+            if (!sharedAudioCtx) {
+                sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (sharedAudioCtx.state === 'suspended') {
+                sharedAudioCtx.resume();
+            }
+        }
+        document.addEventListener('click', initAudio, { once: true });
+
+        function playNotificationSound() {
+            initAudio();
+            if (!sharedAudioCtx) return;
+            try {
+                const osc = sharedAudioCtx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, sharedAudioCtx.currentTime);
+                osc.connect(sharedAudioCtx.destination);
+                osc.start();
+                osc.stop(sharedAudioCtx.currentTime + 0.2);
+            } catch (e) {
+                console.log("Audio play error", e);
+            }
+        }
 
         // 1. Tự động kết nối lại WebSocket nếu đứt kết nối ngầm (Auto-Reconnect)
         function connectWebSocket() {
@@ -149,7 +175,6 @@
             ws.onopen = () => {
                 document.getElementById('wsDot').className = "w-3 h-3 rounded-full bg-emerald-500 animate-pulse";
                 document.getElementById('wsText').innerText = "Real-time đang kết nối";
-                // Khi kết nối thành công, tải lại dữ liệu mới nhất
                 loadDashboardData();
             };
 
@@ -161,13 +186,13 @@
             ws.onclose = () => {
                 document.getElementById('wsDot').className = "w-3 h-3 rounded-full bg-rose-500";
                 document.getElementById('wsText').innerText = "Mất kết nối - Thử lại sau 3s...";
-                setTimeout(connectWebSocket, 3000); // Tự kết nối lại sau 3s
+                setTimeout(connectWebSocket, 3000);
             };
 
             ws.onerror = () => ws.close();
         }
 
-        // 2. Xử lý sự kiện Real-time nhận được từ máy cụ
+        // 2. Xử lý sự kiện Real-time (Bổ sung cả MEDICATION_UNDO)
         function handleRealtimeEvent(event) {
             console.log("WebSocket event:", event);
             const container = document.getElementById('liveLogsContainer');
@@ -181,6 +206,17 @@
                             <span class="text-sm font-bold text-emerald-800">✅ Cụ vừa uống thuốc: ${event.medicine_name}</span>
                         </div>
                         <span class="text-xs text-emerald-600 font-semibold">${event.time}</span>
+                    </div>
+                `;
+                playNotificationSound();
+            } else if (event.event === "MEDICATION_UNDO") {
+                logHtml = `
+                    <div class="flex items-center justify-between p-3.5 bg-amber-50 rounded-xl border border-amber-200">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                            <span class="text-sm font-bold text-amber-800">↩️ Cụ vừa bấm hoàn tác xác nhận uống thuốc</span>
+                        </div>
+                        <span class="text-xs text-amber-600 font-semibold">${event.time || 'Vừa xong'}</span>
                     </div>
                 `;
                 playNotificationSound();
@@ -204,38 +240,27 @@
 
             if (logHtml) {
                 container.insertAdjacentHTML('afterbegin', logHtml);
-                loadDashboardData(); // Cập nhật lại biểu đồ và card
+                loadDashboardData();
             }
         }
 
-        function playNotificationSound() {
-            // Âm chuông báo nhẹ
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = audioCtx.createOscillator();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-            osc.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.2);
-        }
-
-        // 3. Tải toàn bộ dữ liệu thống kê & biểu đồ
+        // 3. Tải toàn bộ dữ liệu thống kê & biểu đồ (Đồng bộ chuẩn medication_stats)
         async function loadDashboardData() {
             try {
-                // Tóm tắt
                 const sumRes = await fetch(`${API_BASE}/family/summary/${elderlyId}`);
                 const sumData = await sumRes.json();
 
+                // Cập nhật thẻ Huyết áp
                 if (sumData.latest_vital && sumData.latest_vital.systolic) {
                     document.getElementById('statBpValue').innerText = `${sumData.latest_vital.systolic}/${sumData.latest_vital.diastolic}`;
                     document.getElementById('statBpTime').innerText = sumData.latest_vital.time || "Gần đây";
                     
-                    const cat = sumData.latest_vital.category;
+                    const cat = sumData.latest_vital.category || "";
                     const tag = document.getElementById('statBpTag');
                     if (cat.includes("CRITICAL")) {
                         tag.className = "text-xs px-2.5 py-1 rounded-full font-bold bg-rose-100 text-rose-800 animate-pulse";
                         tag.innerText = "NGUY HIỂM";
-                    } else if (cat.includes("STAGE") || cat.includes("LOW")) {
+                    } else if (cat.includes("STAGE") || cat.includes("LOW") || cat.includes("DANGER")) {
                         tag.className = "text-xs px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800";
                         tag.innerText = "CẦN CHÚ Ý";
                     } else {
@@ -244,7 +269,15 @@
                     }
                 }
 
-                // Lịch sử biểu đồ
+                // Cập nhật thẻ Thuốc từ medication_stats động
+                if (sumData.medication_stats) {
+                    const stats = sumData.medication_stats;
+                    document.getElementById('statMedRate').innerText = `${stats.compliance_rate}%`;
+                    document.getElementById('statMedCount').innerText = `(Đã uống ${stats.taken_today}/${stats.total_today} cữ)`;
+                    document.getElementById('statMedBar').style.width = `${stats.compliance_rate}%`;
+                }
+
+                // Tải lịch sử biểu đồ
                 const vitalsRes = await fetch(`${API_BASE}/elderly/${elderlyId}/vitals/history`);
                 const vitalsHistory = await vitalsRes.json();
                 renderChart(vitalsHistory);

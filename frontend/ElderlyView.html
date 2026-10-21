@@ -273,15 +273,30 @@
             micIcon.className = "fa-solid fa-microphone text-4xl";
         }
 
-        // Xử lý câu nói (BƯỚC 1: Parse & Hỏi xác nhận)
+        // Xử lý câu nói (BƯỚC 1: Parse & Hỏi xác nhận + Bắt nói 'Đúng rồi' / 'Sai rồi')
         async function handleVoiceCommand(text) {
             document.getElementById('aiSpeechText').innerText = `Cụ vừa nói: "${text}"`;
+            const lowerText = text.toLowerCase();
 
-            if (text.toLowerCase().includes("uống rồi") || text.toLowerCase().includes("đã uống")) {
+            // 1. Nếu đang chờ xác nhận huyết áp mà cụ nói "Đúng rồi", "Phải", "Chuẩn rồi"
+            if (pendingVitalData && (lowerText.includes("đúng") || lowerText.includes("phải") || lowerText.includes("chuẩn") || lowerText.includes("xác nhận") || lowerText.includes("ok"))) {
+                acceptBpLog();
+                return;
+            }
+
+            // 2. Nếu đang chờ xác nhận mà cụ nói "Sai rồi", "Nhầm", "Đọc lại"
+            if (pendingVitalData && (lowerText.includes("sai") || lowerText.includes("nhầm") || lowerText.includes("đọc lại") || lowerText.includes("không phải"))) {
+                cancelBpLog();
+                return;
+            }
+
+            // 3. Nếu cụ báo uống thuốc
+            if (lowerText.includes("uống rồi") || lowerText.includes("đã uống")) {
                 confirmTaken();
                 return;
             }
 
+            // 4. Mặc định: Phân tích huyết áp
             try {
                 const res = await fetch(`${API_BASE}/elderly/vitals/parse-voice`, {
                     method: "POST",
@@ -318,7 +333,7 @@
             }
         }
 
-        // BƯỚC 2: Cụ bấm ĐÚNG RỒI -> Lưu chính thức vào DB
+        // BƯỚC 2: Cụ bấm ĐÚNG RỒI (hoặc nói 'Đúng rồi') -> Lưu chính thức vào DB
         async function acceptBpLog() {
             if (!pendingVitalData) return;
             document.getElementById('bpConfirmBox').classList.add('hidden');

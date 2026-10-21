@@ -17,7 +17,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="AnTam AI Backend API",
     description="Hệ thống Trợ lý Chăm sóc Sức khỏe & Đồng hành cùng Người Cao Tuổi",
-    version="2.1.0"
+    version="2.2.0"
 )
 
 app.add_middleware(
@@ -89,7 +89,7 @@ def pair_device(req: schemas.PairRequest, db: Session = Depends(get_db)):
     if not profile:
         raise HTTPException(status_code=404, detail="Mã ghép nối không đúng. Cụ kiểm tra lại giúp con nhé!")
     
-    profile.last_seen_at = datetime.utcnow()
+    profile.last_seen_at = datetime.now()
     db.commit()
     return profile
 
@@ -132,7 +132,7 @@ async def take_medication(elderly_id: str, med_id: str, req: schemas.MedicationT
     if not med:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn thuốc")
 
-    now = datetime.utcnow()
+    now = datetime.now()
     ten_mins_ago = now - timedelta(minutes=10)
 
     recent_log = db.query(models.MedicationLog).filter(
@@ -187,23 +187,35 @@ async def undo_take_medication(log_id: str, db: Session = Depends(get_db)):
 
     await manager.broadcast({
         "event": "MEDICATION_UNDO",
-        "log_id": log_id
+        "log_id": log_id,
+        "time": datetime.now().strftime("%H:%M")
     })
 
     return {"success": True, "message": "Đã hoàn tác thành công."}
 
 
 # =========================================================================
-# 2. API HUYẾT ÁP GIỌNG NÓI 2 BƯỚC (BÓC TÁCH -> XÁC NHẬN MỚI LƯU)
+# 2. BÓC TÁCH HUYẾT ÁP GIỌNG NÓI ĐA DẠNG & QUY TRÌNH 2 BƯỚC
 # =========================================================================
 
 def extract_bp_from_text(raw_text: str):
-    """Bóc tách số đo huyết áp sau khi đã tiền xử lý 'rưỡi', dấu phẩy, v.v."""
+    """
+    Bóc tách số đo huyết áp sau khi đã tiền xử lý 'rưỡi', dấu phẩy, v.v.
+    Hỗ trợ cả:
+    - Có từ nối: '135 trên 85', '135/85', '135 và 85', '135 tâm trương 85'
+    - Đọc liền 2 số: 'huyết áp 135 85', '13 rưỡi 8 rưỡi'
+    - Bắt nhịp tim: 'nhịp tim 75', 'tim 78', 'mạch 80'
+    """
     clean_text = preprocess_voice_text(raw_text)
     
-    # Tìm mẫu: X trên Y hoặc X / Y hoặc X và Y
-    match = re.search(r'(\d+(?:\.\d+)?)\s*(?:trên|\/|và|-)\s*(\d+(?:\.\d+)?)', clean_text)
-    pulse_match = re.search(r'(?:nhịp tim|tim)\s*(?:là|khoảng)?\s*(\d{2,3})', clean_text)
+    # Ưu tiên 1: Có từ nối
+    match = re.search(r'(\d+(?:\.\d+)?)\s*(?:trên|\/|và|-|tâm trương)\s*(\d+(?:\.\d+)?)', clean_text)
+    
+    # Ưu tiên 2: Nếu cụ đọc liền 2 số cách nhau bằng khoảng trắng (VD: "huyết áp 135 85", "13 8")
+    if not match:
+        match = re.search(r'(\d{1,3}(?:\.\d+)?)\s+(\d{1,3}(?:\.\d+)?)', clean_text)
+
+    pulse_match = re.search(r'(?:nhịp tim|tim|mạch)\s*(?:là|khoảng)?\s*(\d{2,3})', clean_text)
 
     sys_raw = float(match.group(1)) if match else None
     dia_raw = float(match.group(2)) if match else None
@@ -216,10 +228,6 @@ def extract_bp_from_text(raw_text: str):
 
 @app.post("/api/elderly/vitals/parse-voice")
 def parse_voice_vitals(data: schemas.VitalSignParseInput):
-    """
-    BƯỚC 1: Chỉ bóc tách số và kiểm tra Guardrail, CHƯA LƯU DB.
-    Trả về câu hỏi xác nhận: "Dạ con nghe là 135 trên 85. Nếu đúng cụ bấm nút Xanh nhé ạ!"
-    """
     sys_val, dia_val, pulse_val = extract_bp_from_text(data.raw_transcript)
 
     if not sys_val or not dia_val:
@@ -255,11 +263,9 @@ def parse_voice_vitals(data: schemas.VitalSignParseInput):
 
 @app.post("/api/elderly/vitals/confirm-log")
 async def confirm_log_vitals(data: schemas.VitalSignConfirmInput, db: Session = Depends(get_db)):
-    """
-    BƯỚC 2: Cụ bấm nút Xanh 'XÁC NHẬN' -> Lúc này mới chính thức ghi vào DB và bắn WebSocket!
-    """
     eval_result = evaluate_blood_pressure(data.systolic, data.diastolic, data.heart_rate)
 
+    now = datetime.now()
     db_vital = models.VitalSign(
         elderly_id=data.elderly_id,
         systolic=eval_result["systolic"],
@@ -267,15 +273,15 @@ async def confirm_log_vitals(data: schemas.VitalSignConfirmInput, db: Session = 
         heart_rate=data.heart_rate,
         health_category=eval_result["category"],
         input_source="VOICE_INPUT",
-        raw_voice_transcript=data.raw_transcript
+        raw_voice_transcript=data.raw_transcript,
+        measured_at=now
     )
     db.add(db_vital)
     db.commit()
     db.refresh(db_vital)
 
-    now_str = datetime.utcnow().strftime("%H:%M - %d/%m")
+    now_str = now.strftime("%H:%M - %d/%m")
 
-    # Bắn WebSocket sang màn hình FamilyView của con cái
     await manager.broadcast({
         "event": "VITAL_LOGGED",
         "elderly_id": data.elderly_id,
@@ -339,6 +345,8 @@ def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
         models.VitalSign.elderly_id == elderly_id
     ).order_by(models.VitalSign.measured_at.desc()).first()
 
+    compliance = round((taken_count / total_meds * 100), 1) if total_meds > 0 else 100.0
+
     return {
         "profile": {
             "id": profile.id,
@@ -350,7 +358,7 @@ def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
         "medication_stats": {
             "total_today": total_meds,
             "taken_today": taken_count,
-            "compliance_rate": round((taken_count / total_meds * 100), 1) if total_meds > 0 else 100.0
+            "compliance_rate": compliance
         },
         "latest_vital": {
             "systolic": latest_vital.systolic if latest_vital else None,
@@ -403,7 +411,7 @@ def startup_seed_data():
         )
         db.add_all([thuoc_1, thuoc_2])
 
-        now = datetime.utcnow()
+        now = datetime.now()
         v1 = models.VitalSign(elderly_id=cụ_lan.id, systolic=125, diastolic=80, heart_rate=76, health_category="NORMAL", measured_at=now - timedelta(days=2))
         v2 = models.VitalSign(elderly_id=cụ_lan.id, systolic=132, diastolic=84, heart_rate=78, health_category="HIGH_NORMAL", measured_at=now - timedelta(days=1))
         v3 = models.VitalSign(elderly_id=cụ_lan.id, systolic=135, diastolic=85, heart_rate=75, health_category="HIGH_NORMAL", measured_at=now - timedelta(hours=3))
