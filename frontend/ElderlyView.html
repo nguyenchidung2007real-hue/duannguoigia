@@ -86,7 +86,7 @@
                                 <i class="fa-solid fa-check"></i>
                                 <span>ĐÚNG RỒI</span>
                             </button>
-                            <button onclick="cancelBpLog()" class="bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold text-2xl py-4 rounded-xl flex items-center justify-center space-x-2">
+                            <button onclick="cancelBpLog()" class="bg-rose-500 hover:bg-rose-600 active:scale-95 text-white font-bold text-2xl py-4 rounded-xl shadow-lg flex items-center justify-center space-x-2">
                                 <i class="fa-solid fa-xmark"></i>
                                 <span>ĐỌC LẠI</span>
                             </button>
@@ -317,7 +317,8 @@
                         raw_transcript: text
                     };
 
-                    document.getElementById('pendingBpValue').innerText = `${data.systolic} / ${data.diastolic} mmHg`;
+                    const pulseDisplay = data.heart_rate ? ` • Tim: ${Math.round(data.heart_rate)}` : '';
+                    document.getElementById('pendingBpValue').innerText = `${data.systolic} / ${data.diastolic} mmHg${pulseDisplay}`;
                     document.getElementById('bpConfirmBox').classList.remove('hidden');
 
                     document.getElementById('aiSpeechText').innerText = data.confirm_prompt;

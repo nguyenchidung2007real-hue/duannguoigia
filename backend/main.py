@@ -10,7 +10,14 @@ import secrets
 from database import engine, Base, get_db, SessionLocal
 import models
 import schemas
-from services.medical_guardrails import evaluate_blood_pressure, preprocess_voice_text, normalize_bp_value
+
+try:
+    from services.medical_guardrails import evaluate_blood_pressure, preprocess_voice_text, normalize_bp_value
+except ModuleNotFoundError:
+    try:
+        from backend.services.medical_guardrails import evaluate_blood_pressure, preprocess_voice_text, normalize_bp_value
+    except ModuleNotFoundError:
+        from medical_guardrails import evaluate_blood_pressure, preprocess_voice_text, normalize_bp_value
 
 Base.metadata.create_all(bind=engine)
 
@@ -259,22 +266,22 @@ def extract_bp_from_text(raw_text: str):
 def parse_voice_vitals(data: schemas.VitalSignParseInput):
     sys_val, dia_val, pulse_val = extract_bp_from_text(data.raw_transcript)
 
-    # Xử lý các tình huống biên khi chỉ bắt được 1 số hoặc không bắt được số nào
-    if sys_val and not dia_val:
+    # Xử lý các tình huống biên khi chỉ bắt được 1 số hoặc không bắt được số nào (dùng is None để tránh lỗi số 0 bị falsy)
+    if sys_val is not None and dia_val is None:
         return {
             "success": False,
             "need_retry": True,
             "message": f"Dạ con mới chỉ nghe được một chỉ số huyết áp là {sys_val}. Cụ đọc giúp con đủ cả hai số, số trên và số dưới (ví dụ '{sys_val} trên 80') nhé ạ!"
         }
 
-    if not sys_val and dia_val:
+    if sys_val is None and dia_val is not None:
         return {
             "success": False,
             "need_retry": True,
             "message": f"Dạ con mới chỉ nghe được chỉ số tâm trương là {dia_val}. Cụ đọc giúp con đủ cả hai số, số trên và số dưới (ví dụ '120 trên {dia_val}') nhé ạ!"
         }
 
-    if not sys_val or not dia_val:
+    if sys_val is None or dia_val is None:
         return {
             "success": False,
             "need_retry": True,
@@ -290,7 +297,11 @@ def parse_voice_vitals(data: schemas.VitalSignParseInput):
             "message": eval_result["advice"]
         }
 
-    confirm_prompt = f"Dạ con nghe huyết áp của cụ là {eval_result['systolic']} trên {eval_result['diastolic']}. Đúng rồi thì cụ bấm nút Xanh 'XÁC NHẬN' giúp con nhé ạ!"
+    pulse_text = f", nhịp tim {int(pulse_val)} nhịp mỗi phút" if pulse_val else ""
+    confirm_prompt = (
+        f"Dạ con nghe số trên là {eval_result['systolic']}, số dưới là {eval_result['diastolic']}{pulse_text}. "
+        f"Đúng rồi thì cụ bấm nút Xanh 'ĐÚNG RỒI', nếu chưa đúng cụ bấm nút ĐỎ đọc lại giúp con nhé ạ!"
+    )
 
     return {
         "success": True,
@@ -298,6 +309,7 @@ def parse_voice_vitals(data: schemas.VitalSignParseInput):
         "systolic": eval_result["systolic"],
         "diastolic": eval_result["diastolic"],
         "heart_rate": pulse_val,
+        "pulse_status": eval_result.get("pulse_status", "NORMAL"),
         "category": eval_result["category"],
         "title": eval_result["title"],
         "is_emergency": eval_result.get("is_emergency", False),
