@@ -142,7 +142,6 @@
         let ws = null;
         let sharedAudioCtx = null;
 
-        // Tự động kích hoạt AudioContext khi người dùng chạm vào màn hình (Tránh Chrome Autoplay Policy)
         function initAudio() {
             if (!sharedAudioCtx) {
                 sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -244,13 +243,13 @@
             }
         }
 
-        // 3. Tải toàn bộ dữ liệu thống kê & biểu đồ (Đồng bộ chuẩn medication_stats)
+        // 3. Tải toàn bộ dữ liệu thống kê & biểu đồ (Đồng bộ chuẩn medication_stats & MIXED_DANGER)
         async function loadDashboardData() {
             try {
                 const sumRes = await fetch(`${API_BASE}/family/summary/${elderlyId}`);
                 const sumData = await sumRes.json();
 
-                // Cập nhật thẻ Huyết áp
+                // Cập nhật thẻ Huyết áp (Hỗ trợ bắt chuẩn cả CRITICAL, STAGE, LOW và MIXED_DANGER)
                 if (sumData.latest_vital && sumData.latest_vital.systolic) {
                     document.getElementById('statBpValue').innerText = `${sumData.latest_vital.systolic}/${sumData.latest_vital.diastolic}`;
                     document.getElementById('statBpTime').innerText = sumData.latest_vital.time || "Gần đây";
@@ -260,7 +259,7 @@
                     if (cat.includes("CRITICAL")) {
                         tag.className = "text-xs px-2.5 py-1 rounded-full font-bold bg-rose-100 text-rose-800 animate-pulse";
                         tag.innerText = "NGUY HIỂM";
-                    } else if (cat.includes("STAGE") || cat.includes("LOW") || cat.includes("DANGER")) {
+                    } else if (cat.includes("STAGE") || cat.includes("LOW") || cat.includes("MIXED") || cat.includes("DANGER")) {
                         tag.className = "text-xs px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800";
                         tag.innerText = "CẦN CHÚ Ý";
                     } else {

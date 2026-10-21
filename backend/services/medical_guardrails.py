@@ -1,8 +1,8 @@
 """
-Dịch vụ kiểm tra và phân loại chỉ số huyết áp theo chuẩn Y tế (Rule-based Guardrail) - Bản nâng cấp V3.
-- Xử lý số lẻ "rưỡi", dấu phẩy thập phân và đọc rút gọn (13 rưỡi -> 135, 8 rưỡi -> 85).
+Dịch vụ kiểm tra và phân loại chỉ số huyết áp theo chuẩn Y tế (Rule-based Guardrail) - Bản nâng cấp V3.1.
+- Xử lý số lẻ "rưỡi", dấu phẩy thập phân và đọc rút gọn chuẩn xác (13 rưỡi -> 135, 13 5 -> 135, nhưng "13 8" -> 130 và 80).
 - Thang đo Mức độ nghiêm trọng (Severity Score: 0 -> 4) đảm bảo không bị đè mất cảnh báo Hạ huyết áp.
-- Phát hiện kẹp huyết áp nguy hiểm (ví dụ 155/55: Vừa tăng tâm thu vừa hạ tâm trương).
+- Phát hiện kẹp huyết áp nguy hiểm MIXED_DANGER (ví dụ 155/55: Vừa tăng tâm thu vừa hạ tâm trương).
 """
 import re
 
@@ -28,7 +28,7 @@ def preprocess_voice_text(text: str) -> str:
     - "13 rưỡi" -> "13.5"
     - "mười ba rưỡi" -> "13.5"
     - Đổi dấu phẩy thành dấu chấm ("13,5" -> "13.5")
-    - Xử lý khoảng trắng lẻ ("13 5" -> "13.5")
+    - Chỉ gộp khoảng trắng khi số đằng sau là số 5 ("13 5" -> "13.5"), tuyệt đối KHÔNG gộp "13 8" thành "13.8"
     """
     t = text.lower()
     # Đổi chữ số cơ bản nếu STT trả về chữ
@@ -45,8 +45,8 @@ def preprocess_voice_text(text: str) -> str:
     t = re.sub(r'(\d+)\s*rưỡi', r'\1.5', t)
     # Đổi dấu phẩy thập phân thành dấu chấm ("13,5" -> "13.5")
     t = re.sub(r'(\d+),(\d+)', r'\1.\2', t)
-    # Đổi số cách số ("13 5" -> "13.5") nếu là phần thập phân
-    t = re.sub(r'(\b\d{1,2})\s+([1-9]\b)', r'\1.\2', t)
+    # Chỉ gộp khi số đằng sau là số 5 (Ví dụ: "13 5" -> "13.5", nhưng "13 8" giữ nguyên "13 8")
+    t = re.sub(r'(\b(?:1[0-9]|2[0-2]|[6-9]))\s+(5\b)', r'\1.\2', t)
     return t
 
 def evaluate_blood_pressure(systolic: float, diastolic: float, pulse: float = None) -> dict:
@@ -93,9 +93,9 @@ def evaluate_blood_pressure(systolic: float, diastolic: float, pulse: float = No
     elif systolic >= 90:
         sys_cat, sys_sev = "NORMAL", 0
     elif systolic < 70:
-        sys_cat, sys_sev = "CRITICAL_LOW", 4 # Tụt huyết áp nặng nguy kịch
+        sys_cat, sys_sev = "CRITICAL_LOW", 4
     else:
-        sys_cat, sys_sev = "LOW_BP", 3 # Hạ huyết áp nguy cơ ngất ngã
+        sys_cat, sys_sev = "LOW_BP", 3
 
     # 2. Đánh giá Mức độ nghiêm trọng Tâm trương
     if diastolic >= 110:
