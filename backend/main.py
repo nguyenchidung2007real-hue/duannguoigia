@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, date, timedelta
+import asyncio
 import random
 import re
 import secrets
@@ -338,6 +340,28 @@ async def confirm_log_vitals(data: schemas.VitalSignConfirmInput, db: Session = 
 
     now_str = now.strftime("%H:%M - %d/%m")
 
+    # Nếu huyết áp ở mức nguy kịch (Severity Level 4) -> Tự động kích hoạt SOS vào HealthAndSOSLog
+    if eval_result.get("is_emergency"):
+        sos_entry = models.HealthAndSOSLog(
+            elderly_id=data.elderly_id,
+            trigger_source="VITAL_CRITICAL",
+            escalation_status="BROADCASTED_FAMILY",
+            location_note=f"Huyết áp nguy kịch: {eval_result['systolic']}/{eval_result['diastolic']} mmHg",
+            triggered_at=now
+        )
+        db.add(sos_entry)
+        db.commit()
+
+        await manager.broadcast({
+            "event": "SOS_ALERT",
+            "elderly_id": data.elderly_id,
+            "full_name": "Người cao tuổi",
+            "trigger_source": "VITAL_CRITICAL",
+            "location": "Tại nhà",
+            "time": now_str,
+            "message": f"🚨 BÁO ĐỘNG ĐỎ: Huyết áp nguy kịch ({eval_result['systolic']}/{eval_result['diastolic']} mmHg) - Cần hỗ trợ khẩn cấp!"
+        })
+
     await manager.broadcast({
         "event": "VITAL_LOGGED",
         "elderly_id": data.elderly_id,
@@ -376,7 +400,238 @@ def get_vitals_history(elderly_id: str, db: Session = Depends(get_db)):
 
 
 # ========================================================
-# 3. API CON CÁI (FAMILY / CAREGIVER DASHBOARD)
+# 3. API KHẨN CẤP SOS & MÃ QR CỨU HỘ
+# ========================================================
+
+@app.post("/api/elderly/{elderly_id}/sos")
+async def trigger_elderly_sos(elderly_id: str, db: Session = Depends(get_db)):
+    profile = db.query(models.ElderlyProfile).filter(models.ElderlyProfile.id == elderly_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hồ sơ người cao tuổi")
+
+    now = datetime.now()
+    now_str = now.strftime("%H:%M - %d/%m")
+
+    sos_entry = models.HealthAndSOSLog(
+        elderly_id=elderly_id,
+        trigger_source="RED_BUTTON",
+        escalation_status="BROADCASTED_FAMILY",
+        location_note="Tại nhà (Cụ bấm nút SOS)",
+        triggered_at=now
+    )
+    db.add(sos_entry)
+    db.commit()
+
+    await manager.broadcast({
+        "event": "SOS_ALERT",
+        "elderly_id": elderly_id,
+        "full_name": profile.full_name,
+        "trigger_source": "RED_BUTTON",
+        "location": "Tại nhà",
+        "time": now_str,
+        "message": f"🚨 BÁO ĐỘNG ĐỎ: Cụ {profile.full_name} vừa bấm nút CẤP CỨU SOS tại nhà!"
+    })
+
+    return {
+        "success": True,
+        "message": "Dạ con đã phát chuông báo động khẩn cấp tới con cháu ngay lập tức rồi ạ! Cụ hãy ngồi nghỉ ngay tại chỗ nhé ạ!"
+    }
+
+@app.get("/qr/{token}", response_class=HTMLResponse)
+async def public_emergency_qr_view(token: str, db: Session = Depends(get_db)):
+    profile = db.query(models.ElderlyProfile).filter(models.ElderlyProfile.emergency_qr_token == token).first()
+    if not profile:
+        return HTMLResponse("<h2 style='text-align:center;margin-top:50px;'>Mã cứu hộ không tồn tại hoặc đã hết hạn.</h2>", status_code=404)
+
+    contact = db.query(models.FamilyMember).filter(
+        models.FamilyMember.elderly_id == profile.id,
+        models.FamilyMember.is_primary_contact == True
+    ).first()
+
+    phone = contact.phone_number if contact else "0912345678"
+    contact_name = contact.full_name if contact else "Người thân"
+
+    now = datetime.now()
+    sos_entry = models.HealthAndSOSLog(
+        elderly_id=profile.id,
+        trigger_source="PUBLIC_QR_SCAN",
+        escalation_status="BROADCASTED_FAMILY",
+        location_note="Quét mã QR cứu hộ ngoài đường",
+        triggered_at=now
+    )
+    db.add(sos_entry)
+    db.commit()
+
+    await manager.broadcast({
+        "event": "SOS_ALERT",
+        "elderly_id": profile.id,
+        "full_name": profile.full_name,
+        "trigger_source": "PUBLIC_QR_SCAN",
+        "location": "Ngoài đường (Quét mã cứu hộ)",
+        "time": now.strftime("%H:%M - %d/%m"),
+        "message": f"⚠️ CẢNH BÁO: Người đi đường vừa quét mã QR cứu hộ của Cụ {profile.full_name} ngoài đường!"
+    })
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cứu Hộ Khẩn Cấp - {profile.full_name}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 font-sans p-4 max-w-lg mx-auto min-h-screen">
+    <div class="bg-rose-600 text-white p-5 rounded-3xl text-center shadow-xl mb-4 animate-pulse">
+        <i class="fa-solid fa-triangle-exclamation text-4xl mb-2"></i>
+        <h1 class="text-2xl font-black uppercase tracking-wider">Thẻ Cứu Hộ Y Tế Khẩn Cấp</h1>
+        <p class="text-sm opacity-90">Hệ thống trợ lý AnTam AI phát hiện người cao tuổi cần hỗ trợ</p>
+    </div>
+
+    <div class="bg-white rounded-3xl p-6 shadow-md border border-slate-200 mb-4 space-y-4">
+        <div>
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Họ và tên</span>
+            <p class="text-2xl font-extrabold text-slate-900">{profile.full_name} ({profile.birth_year})</p>
+        </div>
+        <div>
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Địa chỉ nhà</span>
+            <p class="text-lg text-slate-800">{profile.address or 'Số 45, Phố Huế, Hai Bà Trưng, Hà Nội'}</p>
+        </div>
+        <div class="p-3.5 bg-amber-50 rounded-2xl border border-amber-200">
+            <span class="text-xs font-bold text-amber-800 uppercase tracking-wider">Bệnh nền cần lưu ý</span>
+            <p class="text-base font-semibold text-amber-950 mt-0.5">{profile.medical_history or 'Không có'}</p>
+        </div>
+        <div class="p-3.5 bg-rose-50 rounded-2xl border border-rose-300">
+            <span class="text-xs font-bold text-rose-800 uppercase tracking-wider">⚠️ DỊ ỨNG THUỐC ĐẶC BIỆT</span>
+            <p class="text-lg font-black text-rose-700 mt-0.5">{profile.drug_allergies or 'Không rõ'}</p>
+        </div>
+    </div>
+
+    <div class="space-y-3">
+        <a href="tel:{phone}" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xl py-5 rounded-2xl shadow-lg flex items-center justify-center space-x-3 transition">
+            <i class="fa-solid fa-phone-volume text-2xl"></i>
+            <span>GỌI NGƯỜI NHÀ ({contact_name}: {phone})</span>
+        </a>
+        <a href="tel:115" class="w-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xl py-5 rounded-2xl shadow-lg flex items-center justify-center space-x-3 transition">
+            <i class="fa-solid fa-truck-medical text-2xl"></i>
+            <span>GỌI CẤP CỨU 115</span>
+        </a>
+    </div>
+    <p class="text-center text-xs text-slate-500 mt-6">
+        Dữ liệu được bảo trợ bởi Hệ sinh thái Trợ lý AnTam AI
+    </p>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
+
+
+# ========================================================
+# 4. TỰ ĐỘNG LẬP LỊCH NHẮC THUỐC (BACKGROUND SCHEDULER)
+# ========================================================
+
+async def check_medication_schedules():
+    """Tự động quét lịch thuốc và phát nhắc nhở thời gian thực"""
+    db = SessionLocal()
+    try:
+        now = datetime.now()
+        current_hm = now.strftime("%H:%M")
+        today_start = datetime.combine(date.today(), datetime.min.time())
+
+        active_meds = db.query(models.MedicationSchedule).filter(
+            models.MedicationSchedule.is_active == True
+        ).all()
+
+        for med in active_meds:
+            if not med.schedule_times or current_hm not in med.schedule_times:
+                continue
+
+            log = db.query(models.MedicationLog).filter(
+                models.MedicationLog.medication_id == med.id,
+                models.MedicationLog.scheduled_time >= today_start
+            ).order_by(models.MedicationLog.scheduled_time.desc()).first()
+
+            if not log:
+                # Lần nhắc thứ 1
+                new_log = models.MedicationLog(
+                    medication_id=med.id,
+                    elderly_id=med.elderly_id,
+                    scheduled_time=now,
+                    status="REMINDED_1",
+                    reminder_count=1
+                )
+                db.add(new_log)
+                db.commit()
+
+                prompt = f"Dạ thưa cụ, đã đến giờ uống thuốc {med.medicine_name} rồi ạ! Cụ uống {med.dosage} {med.pill_color_shape} giúp con nhé ạ!"
+                await manager.broadcast({
+                    "event": "MEDICATION_REMINDER",
+                    "elderly_id": med.elderly_id,
+                    "medication_id": med.id,
+                    "medicine_name": med.medicine_name,
+                    "dosage": med.dosage,
+                    "pill_desc": med.pill_color_shape,
+                    "time": current_hm,
+                    "reminder_count": 1,
+                    "speech_prompt": prompt
+                })
+            elif log.status != "TAKEN" and log.status != "MISSED_ESCALATED":
+                # Nhắc lại nếu chưa uống
+                diff_mins = (now - log.scheduled_time).total_seconds() / 60
+                if diff_mins >= (5 * log.reminder_count):
+                    log.reminder_count += 1
+                    if log.reminder_count <= 3:
+                        log.status = f"REMINDED_{log.reminder_count}"
+                        db.commit()
+
+                        prompt = f"Dạ thưa cụ, con nhắc cụ lần {log.reminder_count} uống thuốc {med.medicine_name} ạ! Cụ uống ngay giúp con nhé!"
+                        await manager.broadcast({
+                            "event": "MEDICATION_REMINDER",
+                            "elderly_id": med.elderly_id,
+                            "medication_id": med.id,
+                            "medicine_name": med.medicine_name,
+                            "dosage": med.dosage,
+                            "pill_desc": med.pill_color_shape,
+                            "time": current_hm,
+                            "reminder_count": log.reminder_count,
+                            "speech_prompt": prompt
+                        })
+                    else:
+                        log.status = "MISSED_ESCALATED"
+                        sos_log = models.HealthAndSOSLog(
+                            elderly_id=med.elderly_id,
+                            trigger_source="DEADMAN_MISSED",
+                            escalation_status="BROADCASTED_FAMILY",
+                            location_note=f"Bỏ lỡ cữ thuốc {med.medicine_name} sau 3 lần nhắc"
+                        )
+                        db.add(sos_log)
+                        db.commit()
+
+                        await manager.broadcast({
+                            "event": "MEDICATION_MISSED_ALERT",
+                            "elderly_id": med.elderly_id,
+                            "medication_id": med.id,
+                            "medicine_name": med.medicine_name,
+                            "scheduled_time": log.scheduled_time.strftime("%H:%M"),
+                            "time": current_hm,
+                            "message": f"CẢNH BÁO: Cụ chưa uống thuốc {med.medicine_name} sau 3 lần nhắc nhở!"
+                        })
+    except Exception as e:
+        print(f"Error in scheduler: {e}")
+    finally:
+        db.close()
+
+async def background_scheduler_worker():
+    """Vòng lặp ngầm quét lịch thuốc mỗi 30 giây"""
+    while True:
+        try:
+            await check_medication_schedules()
+        except Exception as e:
+            print("Background scheduler exception:", e)
+        await asyncio.sleep(30)
+
+
+# ========================================================
+# 5. API CON CÁI (FAMILY / CAREGIVER DASHBOARD)
 # ========================================================
 
 @app.get("/api/family/summary/{elderly_id}")
@@ -427,9 +682,8 @@ def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
 
 
 # ========================================================
-# 4. SEED DATA KHỞI ĐỘNG
+# 6. SEED DATA KHỞI ĐỘNG & BẬT BACKGROUND WORKER
 # ========================================================
-@app.on_event("startup")
 def startup_seed_data():
     db = SessionLocal()
     existing = db.query(models.ElderlyProfile).first()
@@ -474,4 +728,23 @@ def startup_seed_data():
         db.add_all([v1, v2, v3])
 
         db.commit()
+
+    # Đảm bảo có thông tin người nhà liên hệ khẩn cấp
+    con_trai = db.query(models.FamilyMember).filter(models.FamilyMember.elderly_id == "lan_1952").first()
+    if not con_trai:
+        con_trai = models.FamilyMember(
+            elderly_id="lan_1952",
+            full_name="Nguyễn Văn Hùng",
+            phone_number="0912345678",
+            relationship_type="CON_TRAI",
+            is_primary_contact=True
+        )
+        db.add(con_trai)
+        db.commit()
+
     db.close()
+
+@app.on_event("startup")
+async def on_app_startup():
+    startup_seed_data()
+    asyncio.create_task(background_scheduler_worker())

@@ -1,18 +1,28 @@
-# QUY TẮC CỐT LÕI DỰ ÁN TRỢ LÝ AI NGƯỜI CAO TUỔI (ZERO-FRICTION)
+# QUY TẮC CỐT LÕI DỰ ÁN TRỢ LÝ AI NGƯỜI CAO TUỔI (ZERO-FRICTION & MEDICAL SAFETY)
 
-1. Giao diện Người cao tuổi (`ElderlyView`):
-   - TUYỆT ĐỐI không có màn hình đăng nhập mật khẩu (sử dụng device_token hoặc mã ghép nối 6 số).
-   - Mọi cỡ chữ tối thiểu từ text-2xl (24px) trở lên, độ tương phản cao chuẩn WCAG AAA.
-   - Không sử dụng bất kỳ từ tiếng Anh nào trên giao diện người dùng (Ví dụ: không dùng "Submit", "Cancel", "Dashboard", "OK").
-   - Chỉ hiển thị 2-3 nút hành động chính chiếm toàn màn hình:
-     * Nút Xanh Lá (ĐÃ UỐNG THUỐC)
-     * Nút Xanh Dương (BẤM ĐỂ NÓI)
-     * Nút Đỏ (CẤP CỨU SOS - nếu kích hoạt)
+## 1. Giao diện Người cao tuổi (`ElderlyView`):
+- TUYỆT ĐỐI không có màn hình đăng nhập mật khẩu (sử dụng device_token hoặc mã ghép nối 6 số).
+- Mọi cỡ chữ tối thiểu từ text-2xl (24px) trở lên, độ tương phản cao chuẩn WCAG AAA.
+- Không sử dụng bất kỳ từ tiếng Anh nào trên giao diện người dùng (Ví dụ: không dùng "Submit", "Cancel", "Dashboard", "OK").
+- Bố trí các nút hành động chính chiếm toàn màn hình, chạm 1 chạm:
+  * Nút Xanh Lá (ĐÃ UỐNG THUỐC) - Hỗ trợ danh sách đa cữ trong ngày
+  * Nút Xanh Dương (BẤM ĐỂ NÓI)
+  * Nút Đỏ Khẩn cấp (CẤP CỨU SOS)
 
-2. An toàn Y tế & Giọng nói (`Backend` & `AI`):
-   - Mọi câu trả lời từ AI đều phải bắt đầu bằng kính ngữ lễ phép ("Dạ thưa cụ...", "Dạ con nghe ạ...").
-   - Không bao giờ để LLM tự phán đoán mức độ nguy hiểm của huyết áp. Bắt buộc đi qua hàm `check_blood_pressure_guardrail(sys, dia, pulse)` bằng Python trước khi sinh câu trả lời.
-   - Khi nhận chỉ số huyết áp bằng giọng nói, luôn yêu cầu bước xác nhận (`PENDING_CONFIRMATION`) trước khi lưu chính thức vào Database.
+## 2. An toàn Y tế & Giọng nói (`Backend` & `AI`):
+- Mọi câu trả lời từ AI đều phải bắt đầu bằng kính ngữ lễ phép ("Dạ thưa cụ...", "Dạ con nghe ạ...").
+- Bắt buộc đi qua hàm `evaluate_blood_pressure(sys, dia, pulse)` bằng Python thuần trước khi sinh câu trả lời.
+- Khi nhận chỉ số huyết áp bằng giọng nói, luôn qua quy trình 2 bước (`Two-Phase Commit`): Bóc tách số & Đọc to xác nhận -> Cụ bấm "ĐÚNG RỒI" mới lưu DB và phát WebSocket.
 
-3. Xử lý Thời gian thực (`WebSocket`):
-   - Mọi tín hiệu cảnh báo (quá giờ uống thuốc không phản hồi, chỉ số huyết áp vượt ngưỡng nguy hiểm, hoặc bấm SOS) phải bắn sự kiện qua WebSocket về `FamilyDashboard` ngay lập tức.
+## 3. Xử lý Thời gian thực (`WebSocket`):
+- Mọi tín hiệu cảnh báo (quá giờ uống thuốc không phản hồi, chỉ số huyết áp vượt ngưỡng nguy hiểm, hoặc bấm SOS) phải bắn sự kiện qua WebSocket về `FamilyDashboard` ngay lập tức.
+
+## 4. Bốn Quy tắc Khóa Kiến trúc Mở rộng (Guardrail Rules):
+- **Rule 1 — Tách biệt AI & Y khoa (Hybrid AI Architecture)**:
+  Mô hình ngôn ngữ (LLM/SLM) chỉ được phép dùng cho: (a) Phân loại ý định/cảm xúc từ câu nói (PhoBERT), và (b) Diễn đạt lại lời khuyên thành câu văn lễ phép theo bệnh nền (Qwen). Tuyệt đối KHÔNG dùng LLM để tính toán hay phân loại ngưỡng huyết áp/nhịp tim — mọi phép so sánh chỉ số sinh tồn bắt buộc phải đi qua `services/medical_guardrails.py`.
+- **Rule 2 — Bất biến Hợp đồng API & WebSocket (Contract First)**:
+  Mọi sự kiện phát qua `manager.broadcast()` trong `main.py` (như `MEDICATION_TAKEN`, `MEDICATION_UNDO`, `MEDICATION_REMINDER`, `MEDICATION_MISSED_ALERT`, `VITAL_LOGGED`, `SOS_ALERT`) bắt buộc phải có nhánh xử lý tương ứng trong `handleRealtimeEvent()` của cả `FamilyView.html` và `ElderlyView.html`.
+- **Rule 3 — Bắt buộc Chạy Test Suite Trước Khi Commit**:
+  Mỗi khi chỉnh sửa Regex hoặc Logic trong `medical_guardrails.py` hoặc `main.py`, bắt buộc phải chạy lại bộ Test Suite 6 phần (Edge Cases Spacing, Physiological Bounds, Categories, 115 Protocol, Pulse Evaluation, Endpoint Logic) và đảm bảo PASS 100% trước khi đẩy code lên git.
+- **Rule 4 — Tiêu chuẩn Zero-Friction cho Mọi Tính năng Mới**:
+  Mọi tính năng thêm vào `ElderlyView.html` không được phép yêu cầu gõ bàn phím, không dùng menu ẩn (dropdown/hamburger menu), kích thước chữ tối thiểu 1.6rem và mọi hành động ghi dữ liệu giọng nói đều phải qua bước xác nhận 2 chiều.

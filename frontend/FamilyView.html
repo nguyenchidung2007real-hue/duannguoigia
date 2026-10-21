@@ -47,9 +47,15 @@
                 </div>
             </div>
 
-            <div class="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-center">
-                <span class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Mã Ghép Nối Không Mật Khẩu</span>
-                <p class="text-2xl font-extrabold text-blue-600 tracking-widest mt-0.5" id="profilePairingCode">123456</p>
+            <div class="flex items-center space-x-3">
+                <a href="http://localhost:8000/qr/qr_lan_1952" target="_blank" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 px-4 py-2.5 rounded-xl text-center flex items-center space-x-2 transition">
+                    <i class="fa-solid fa-qrcode text-xl"></i>
+                    <span class="text-xs font-bold uppercase">Mã QR Cứu Hộ</span>
+                </a>
+                <div class="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-center">
+                    <span class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Mã Ghép Nối</span>
+                    <p class="text-2xl font-extrabold text-blue-600 tracking-widest mt-0.5" id="profilePairingCode">123456</p>
+                </div>
             </div>
         </div>
 
@@ -219,6 +225,38 @@
                     </div>
                 `;
                 playNotificationSound();
+            } else if (event.event === "SOS_ALERT") {
+                logHtml = `
+                    <div class="flex items-center justify-between p-4 bg-rose-100 rounded-2xl border-2 border-rose-500 animate-pulse shadow-lg">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-3.5 h-3.5 rounded-full bg-rose-600 animate-ping"></span>
+                            <span class="text-base font-black text-rose-900">${event.message} (${event.location || 'Tại nhà'})</span>
+                        </div>
+                        <span class="text-xs font-bold text-rose-700">${event.time}</span>
+                    </div>
+                `;
+                playNotificationSound();
+            } else if (event.event === "MEDICATION_MISSED_ALERT") {
+                logHtml = `
+                    <div class="flex items-center justify-between p-3.5 bg-amber-100 rounded-xl border border-amber-400 animate-pulse">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-600"></span>
+                            <span class="text-sm font-bold text-amber-900">⚠️ ${event.message}</span>
+                        </div>
+                        <span class="text-xs text-amber-700">${event.time || ''}</span>
+                    </div>
+                `;
+                playNotificationSound();
+            } else if (event.event === "MEDICATION_REMINDER") {
+                logHtml = `
+                    <div class="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-200">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                            <span class="text-sm font-semibold text-blue-800">⏰ Hệ thống vừa nhắc Cụ uống thuốc: ${event.medicine_name} (Lần ${event.reminder_count})</span>
+                        </div>
+                        <span class="text-xs text-slate-500">${event.time}</span>
+                    </div>
+                `;
             } else if (event.event === "VITAL_LOGGED") {
                 const isDanger = event.is_emergency;
                 const bgClass = isDanger ? "bg-rose-50 border-rose-300" : "bg-blue-50 border-blue-200";

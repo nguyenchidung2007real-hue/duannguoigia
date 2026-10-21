@@ -3,60 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AnTam AI - Trợ Lý Cho Người Cao Tuổi</title>
+    <title>AnTam AI - Trợ Lý Đồng Hành Cùng Cụ Lan</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #F1F5F9;
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontSize: {
+                        'elderly-btn': '2.1rem',
+                        'elderly-title': '2.7rem',
+                        'elderly-body': '1.8rem'
+                    }
+                }
+            }
         }
-        .text-elderly-title { font-size: 2.2rem; line-height: 2.6rem; }
-        .text-elderly-body { font-size: 1.6rem; line-height: 2.2rem; }
-        .text-elderly-btn { font-size: 1.8rem; font-weight: bold; }
-    </style>
+    </script>
 </head>
-<body class="p-4 md:p-8 max-w-2xl mx-auto min-h-screen flex flex-col justify-between">
+<body class="bg-amber-100 font-sans p-4 md:p-6 min-h-screen flex flex-col justify-between select-none">
 
-    <!-- 1. HEADER CHÀO HỎI & TRẠNG THÁI -->
-    <header class="bg-white rounded-3xl p-6 shadow-md border-2 border-slate-200 mb-4 text-center">
-        <div class="flex items-center justify-center space-x-3 mb-2">
-            <span class="w-4 h-4 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="text-xl text-slate-500 font-semibold" id="systemStatus">Hệ thống đang hoạt động tốt</span>
+    <!-- 1. HEADER CHÀO HỎI & NÚT SOS KHẨN CẤP -->
+    <header class="bg-white rounded-3xl p-6 shadow-md border-2 border-slate-200 mb-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="flex items-center space-x-2 mb-1">
+                    <span class="w-4 h-4 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-xl text-emerald-800 font-bold" id="systemStatus">Trợ lý đang hoạt động</span>
+                </div>
+                <h1 class="text-elderly-title font-black text-slate-800" id="greetingText">
+                    Dạ thưa cụ Lan!
+                </h1>
+                <p class="text-lg text-slate-500 mt-0.5" id="currentDateText">
+                    Hôm nay là cữ thuốc và đo huyết áp định kỳ
+                </p>
+            </div>
+            <!-- NÚT CẤP CỨU SOS ĐỎ KHỔNG LỒ (CHẠM 1 CHẠM BÁO ĐỘNG) -->
+            <button onclick="triggerSosEmergency()" class="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-2xl px-6 py-5 rounded-2xl shadow-xl flex items-center space-x-3 border-4 border-rose-300 animate-pulse transition">
+                <i class="fa-solid fa-triangle-exclamation text-3xl"></i>
+                <span>CẤP CỨU SOS</span>
+            </button>
         </div>
-        <h1 class="text-elderly-title font-bold text-slate-800" id="greetingText">
-            Dạ thưa cụ Lan!
-        </h1>
-        <p class="text-xl text-slate-600 mt-1" id="currentDateText">
-            Hôm nay là cữ thuốc và đo huyết áp định kỳ
-        </p>
     </header>
 
-    <!-- 2. THẺ NHẮC THUỐC TRỰC QUAN (CHỐNG BẤM ĐÚP + NÚT HOÀN TÁC) -->
+    <!-- 2. KHU VỰC CHÍNH: DANH SÁCH TOÀN BỘ CỮ THUỐC & PHẢN HỒI HUYẾT ÁP -->
     <main class="space-y-4 flex-grow flex flex-col justify-center">
         
-        <div class="bg-amber-50 rounded-3xl p-6 border-4 border-amber-300 shadow-lg text-center" id="medCard">
-            <span class="inline-block bg-amber-200 text-amber-900 text-xl font-bold px-4 py-1 rounded-full mb-3" id="medTimeTag">
-                ⏰ Cữ thuốc 08:00 Sáng
-            </span>
-            <h2 class="text-elderly-title font-bold text-amber-950 mb-2" id="medName">
-                Amlodipine 5mg
-            </h2>
-            <p class="text-elderly-body text-amber-800 mb-6" id="medDesc">
-                👉 1 viên tròn nhỏ màu vàng (Uống sau ăn)
-            </p>
-
-            <!-- Nút bấm xác nhận ĐÃ UỐNG THUỐC -->
-            <button onclick="confirmTaken()" id="btnTakeMed" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-elderly-btn py-6 rounded-2xl shadow-xl flex items-center justify-center space-x-4 transition">
-                <i class="fa-solid fa-circle-check text-4xl"></i>
-                <span id="takeMedBtnText">BÀ ĐÃ UỐNG THUỐC</span>
-            </button>
-
-            <!-- Nút bấm hoàn tác trong 15s nếu cụ lỡ bấm nhầm -->
-            <div id="undoContainer" class="hidden mt-3">
-                <button onclick="undoTaken()" class="bg-amber-200 hover:bg-amber-300 text-amber-900 text-lg font-bold px-6 py-2 rounded-xl border border-amber-400">
-                    <i class="fa-solid fa-rotate-left mr-2"></i> Bấm nhầm? Bấm vào đây để Hoàn tác (<span id="undoCountdown">15</span>s)
-                </button>
+        <!-- DANH SÁCH TẤT CẢ CÁC CỮ THUỐC TRONG NGÀY (SÁNG / TỐI) -->
+        <div id="medicationList" class="space-y-4">
+            <div class="bg-white rounded-3xl p-8 text-center text-slate-500 text-2xl font-bold border-2 border-slate-200">
+                <i class="fa-solid fa-spinner fa-spin mr-3"></i> Đang tải danh sách thuốc hôm nay...
             </div>
         </div>
 
@@ -69,7 +65,7 @@
                 <div class="flex-grow">
                     <p class="text-lg font-bold text-blue-600 mb-1">Lời nhắn của cháu AnTam:</p>
                     <p class="text-elderly-body text-slate-800" id="aiSpeechText">
-                        "Dạ thưa cụ Lan, cụ nhớ uống viên thuốc huyết áp màu vàng rồi hẵng đi lại nhé ạ!"
+                        "Dạ thưa cụ Lan, cụ nhớ uống thuốc đúng giờ và đo huyết áp giúp con nhé ạ!"
                     </p>
 
                     <!-- Khung xác nhận Huyết áp 2 bước -->
@@ -99,8 +95,8 @@
     </main>
 
     <!-- 4. KHU VỰC NÚT BẤM ĐỂ NÓI PHÍA DƯỚI -->
-    <footer class="mt-6 space-y-3">
-        <button id="btnVoice" onclick="toggleVoiceRecording()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-elderly-btn py-7 rounded-3xl shadow-xl flex items-center justify-center space-x-4 transition border-4 border-blue-400">
+    <footer class="mt-4 space-y-3">
+        <button id="btnVoice" onclick="toggleVoiceRecording()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-elderly-btn py-6 rounded-3xl shadow-xl flex items-center justify-center space-x-4 transition border-4 border-blue-400">
             <i class="fa-solid fa-microphone text-4xl" id="micIcon"></i>
             <span id="micText">BẤM VÀO ĐÂY ĐỂ NÓI</span>
         </button>
@@ -113,9 +109,7 @@
     <script>
         const API_BASE = "http://localhost:8000/api";
         let elderlyId = "lan_1952";
-        let currentMedId = null;
-        let lastLogId = null;
-        let undoTimer = null;
+        let undoTimers = {};
         let isRecording = false;
         let recognition = null;
         let pendingVitalData = null;
@@ -130,173 +124,226 @@
             }
         }
 
+        // Tải và hiển thị TOÀN BỘ các cữ thuốc trong ngày
         async function loadTodayMedications() {
             try {
                 const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/today`);
                 const meds = await res.json();
-                if (meds && meds.length > 0) {
-                    const m = meds[0];
-                    currentMedId = m.medication_id;
-                    document.getElementById('medName').innerText = m.medicine_name;
-                    document.getElementById('medDesc').innerText = `👉 ${m.dosage} - ${m.pill_color_shape} (${m.instructions})`;
-                    document.getElementById('medTimeTag').innerText = `⏰ Cữ thuốc ${m.schedule_times[0]}`;
-
-                    if (m.is_taken) {
-                        setTakenUI(m.taken_time || "hôm nay");
-                    }
-                }
+                renderMedications(meds);
             } catch (e) {
                 console.log("Offline mode");
             }
         }
 
-        function setTakenUI(timeStr) {
-            const btn = document.getElementById('btnTakeMed');
-            btn.className = "w-full bg-slate-400 text-white text-elderly-btn py-6 rounded-2xl shadow flex items-center justify-center space-x-4 cursor-not-allowed";
-            btn.innerHTML = `<i class="fa-solid fa-check-double text-4xl"></i><span>ĐÃ UỐNG LÚC ${timeStr}</span>`;
-            btn.disabled = true;
+        function renderMedications(meds) {
+            const container = document.getElementById('medicationList');
+            if (!meds || meds.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-3xl p-6 text-center text-slate-600 text-xl font-bold">
+                        Hôm nay cụ không có đơn thuốc nào cần uống.
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            meds.forEach(m => {
+                const isTaken = m.is_taken;
+                const borderClass = isTaken ? 'border-slate-300 bg-slate-50 opacity-80' : 'border-amber-300 bg-amber-50';
+                const btnClass = isTaken 
+                    ? 'bg-slate-400 text-white cursor-not-allowed' 
+                    : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-xl';
+                const btnText = isTaken 
+                    ? `<i class="fa-solid fa-check-double text-3xl mr-2"></i> ĐÃ UỐNG LÚC ${m.taken_time || 'HÔM NAY'}`
+                    : `<i class="fa-solid fa-circle-check text-4xl mr-2"></i> BÀ ĐÃ UỐNG VIÊN NÀY`;
+
+                html += `
+                    <div class="rounded-3xl p-6 border-4 ${borderClass} shadow-lg text-center transition" id="card-${m.medication_id}">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="inline-block bg-amber-200 text-amber-900 text-xl font-bold px-4 py-1.5 rounded-full">
+                                ⏰ Cữ thuốc ${m.schedule_times ? m.schedule_times[0] : 'Trong ngày'}
+                            </span>
+                            ${isTaken 
+                                ? '<span class="text-emerald-700 font-bold text-lg"><i class="fa-solid fa-circle-check"></i> Đã hoàn thành</span>' 
+                                : '<span class="text-amber-800 font-bold text-lg animate-pulse"><i class="fa-solid fa-clock"></i> Chưa uống</span>'}
+                        </div>
+                        <h2 class="text-elderly-title font-bold text-amber-950 mb-1">
+                            ${m.medicine_name}
+                        </h2>
+                        <p class="text-elderly-body text-amber-900 mb-5">
+                            👉 ${m.dosage} - ${m.pill_color_shape || 'Viên thuốc'} (${m.instructions || 'Uống theo đơn'})
+                        </p>
+                        <button onclick="confirmTaken('${m.medication_id}', '${m.medicine_name}')" ${isTaken ? 'disabled' : ''} class="w-full ${btnClass} text-elderly-btn py-5 rounded-2xl flex items-center justify-center transition" id="btnTake-${m.medication_id}">
+                            ${btnText}
+                        </button>
+                        <div id="undoBox-${m.medication_id}" class="hidden mt-3">
+                            <button onclick="undoTaken('${m.log_id}', '${m.medication_id}')" class="bg-amber-200 hover:bg-amber-300 text-amber-900 text-lg font-bold px-6 py-2 rounded-xl border border-amber-400">
+                                <i class="fa-solid fa-rotate-left mr-2"></i> Bấm nhầm? Bấm để Hoàn tác (<span id="undoCount-${m.medication_id}">15</span>s)
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
         }
 
-        async function confirmTaken() {
-            const btn = document.getElementById('btnTakeMed');
-            btn.disabled = true;
+        async function confirmTaken(medId, medName) {
+            const btn = document.getElementById(`btnTake-${medId}`);
+            if (btn) btn.disabled = true;
 
             try {
-                const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/${currentMedId || 'sample'}/take`, {
+                const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/${medId}/take`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ confirmation_method: "BUTTON_CLICK" })
                 });
                 const data = await res.json();
                 
-                const nowStr = new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
-                setTakenUI(nowStr);
-                
                 document.getElementById('aiSpeechText').innerText = data.message;
                 speak(data.message);
 
+                await loadTodayMedications();
+
                 if (data.log_id) {
-                    lastLogId = data.log_id;
-                    showUndoButton();
+                    showUndoButton(data.log_id, medId);
                 }
-            } catch (err) {
-                setTakenUI("hôm nay");
-                const fallback = "Dạ con đã ghi nhận cụ uống thuốc rồi ạ. Cụ uống thêm ngụm nước ấm nhé!";
-                document.getElementById('aiSpeechText').innerText = fallback;
-                speak(fallback);
+            } catch (e) {
+                if (btn) btn.disabled = false;
+                alert("Lỗi kết nối tới máy chủ.");
             }
         }
 
-        function showUndoButton() {
-            const container = document.getElementById('undoContainer');
-            const countdownSpan = document.getElementById('undoCountdown');
-            container.classList.remove('hidden');
-            let timeLeft = 15;
-            countdownSpan.innerText = timeLeft;
+        function showUndoButton(logId, medId) {
+            const undoBox = document.getElementById(`undoBox-${medId}`);
+            const countSpan = document.getElementById(`undoCount-${medId}`);
+            if (!undoBox || !countSpan) return;
 
-            clearInterval(undoTimer);
-            undoTimer = setInterval(() => {
+            undoBox.classList.remove('hidden');
+            let timeLeft = 15;
+            countSpan.innerText = timeLeft;
+
+            if (undoTimers[medId]) clearInterval(undoTimers[medId]);
+            undoTimers[medId] = setInterval(() => {
                 timeLeft--;
-                countdownSpan.innerText = timeLeft;
+                countSpan.innerText = timeLeft;
                 if (timeLeft <= 0) {
-                    clearInterval(undoTimer);
-                    container.classList.add('hidden');
+                    clearInterval(undoTimers[medId]);
+                    undoBox.classList.add('hidden');
                 }
             }, 1000);
         }
 
-        async function undoTaken() {
-            clearInterval(undoTimer);
-            document.getElementById('undoContainer').classList.add('hidden');
+        async function undoTaken(logId, medId) {
+            if (undoTimers[medId]) clearInterval(undoTimers[medId]);
+            const undoBox = document.getElementById(`undoBox-${medId}`);
+            if (undoBox) undoBox.classList.add('hidden');
 
-            if (lastLogId) {
-                await fetch(`${API_BASE}/elderly/medications/log/${lastLogId}/undo`, { method: "POST" });
+            try {
+                const res = await fetch(`${API_BASE}/elderly/medications/log/${logId}/undo`, { method: "POST" });
+                const data = await res.json();
+                await loadTodayMedications();
+                const msg = "Dạ con đã hoàn tác ghi nhận thuốc rồi ạ!";
+                document.getElementById('aiSpeechText').innerText = msg;
+                speak(msg);
+            } catch (e) {
+                alert("Lỗi khi hoàn tác.");
             }
-
-            const btn = document.getElementById('btnTakeMed');
-            btn.disabled = false;
-            btn.className = "w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-elderly-btn py-6 rounded-2xl shadow-xl flex items-center justify-center space-x-4 transition";
-            btn.innerHTML = `<i class="fa-solid fa-circle-check text-4xl"></i><span>BÀ ĐÃ UỐNG THUỐC</span>`;
-            
-            const msg = "Dạ con đã hoàn tác lại rồi ạ, cụ nhớ uống thuốc đúng giờ nhé!";
-            document.getElementById('aiSpeechText').innerText = msg;
-            speak(msg);
         }
 
-        // Bật mic lắng nghe
-        function toggleVoiceRecording() {
-            const micBtn = document.getElementById('btnVoice');
-            const micText = document.getElementById('micText');
-            const micIcon = document.getElementById('micIcon');
+        // BẤM CẤP CỨU SOS
+        async function triggerSosEmergency() {
+            const prompt = "Dạ con đang phát chuông báo động khẩn cấp tới con cháu ngay đây ạ! Cụ hãy ngồi nghỉ ngay tại chỗ nhé ạ!";
+            document.getElementById('aiSpeechText').innerText = prompt;
+            speak(prompt);
 
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert("Trình duyệt chưa bật micro, cụ dùng Chrome giúp con nhé!");
+            try {
+                await fetch(`${API_BASE}/elderly/${elderlyId}/sos`, { method: "POST" });
+            } catch (err) {
+                console.log("SOS send failed", err);
+            }
+        }
+
+        // NHẬN DIỆN GIỌNG NÓI & BƯỚC 1 PHÂN TÍCH HUYẾT ÁP
+        function toggleVoiceRecording() {
+            if (isRecording) {
+                stopVoice();
+            } else {
+                startVoice();
+            }
+        }
+
+        function startVoice() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Trình duyệt không hỗ trợ Web Speech API.");
                 return;
             }
+            recognition = new SpeechRecognition();
+            recognition.lang = 'vi-VN';
+            recognition.continuous = false;
+            recognition.interimResults = false;
 
-            if (!isRecording) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                recognition = new SpeechRecognition();
-                recognition.lang = 'vi-VN';
-                recognition.continuous = false;
-                recognition.interimResults = false;
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('btnVoice').classList.replace('bg-blue-600', 'bg-rose-600');
+                document.getElementById('micText').innerText = "CON ĐANG LẮNG NGHE CỤ NÓI...";
+                document.getElementById('micIcon').className = "fa-solid fa-waveform-lines text-4xl animate-bounce";
+            };
 
-                recognition.onstart = () => {
-                    isRecording = true;
-                    micBtn.className = "w-full bg-red-500 text-white text-elderly-btn py-7 rounded-3xl shadow-xl flex items-center justify-center space-x-4 animate-pulse border-4 border-red-300";
-                    micText.innerText = "ĐANG LẮNG NGHE CỤ NÓI...";
-                    micIcon.className = "fa-solid fa-circle-dot text-4xl";
-                };
+            recognition.onresult = async (event) => {
+                const text = event.results[0][0].transcript;
+                stopVoice();
+                await handleVoiceCommand(text);
+            };
 
-                recognition.onresult = (event) => {
-                    const transcript = event.results[0][0].transcript;
-                    handleVoiceCommand(transcript);
-                };
+            recognition.onerror = () => stopVoice();
+            recognition.onend = () => stopVoice();
 
-                recognition.onerror = () => resetMicButton();
-                recognition.onend = () => resetMicButton();
-
-                recognition.start();
-            } else {
-                if (recognition) recognition.stop();
-                resetMicButton();
-            }
+            recognition.start();
         }
 
-        function resetMicButton() {
+        function stopVoice() {
             isRecording = false;
-            const micBtn = document.getElementById('btnVoice');
-            const micText = document.getElementById('micText');
-            const micIcon = document.getElementById('micIcon');
-            micBtn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white text-elderly-btn py-7 rounded-3xl shadow-xl flex items-center justify-center space-x-4 border-4 border-blue-400";
-            micText.innerText = "BẤM VÀO ĐÂY ĐỂ NÓI";
-            micIcon.className = "fa-solid fa-microphone text-4xl";
+            document.getElementById('btnVoice').classList.replace('bg-rose-600', 'bg-blue-600');
+            document.getElementById('micText').innerText = "BẤM VÀO ĐÂY ĐỂ NÓI";
+            document.getElementById('micIcon').className = "fa-solid fa-microphone text-4xl";
+            if (recognition) recognition.stop();
         }
 
-        // Xử lý câu nói (BƯỚC 1: Parse & Hỏi xác nhận + Bắt nói 'Đúng rồi' / 'Sai rồi')
         async function handleVoiceCommand(text) {
             document.getElementById('aiSpeechText').innerText = `Cụ vừa nói: "${text}"`;
             const lowerText = text.toLowerCase();
 
-            // 1. Nếu đang chờ xác nhận huyết áp mà cụ nói "Đúng rồi", "Phải", "Chuẩn rồi"
+            // Nếu cụ nói "Đúng rồi", "Chuẩn rồi" khi đang ở bước xác nhận
             if (pendingVitalData && (lowerText.includes("đúng") || lowerText.includes("phải") || lowerText.includes("chuẩn") || lowerText.includes("xác nhận") || lowerText.includes("ok"))) {
                 acceptBpLog();
                 return;
             }
 
-            // 2. Nếu đang chờ xác nhận mà cụ nói "Sai rồi", "Nhầm", "Đọc lại"
+            // Nếu cụ nói "Sai rồi", "Đọc lại"
             if (pendingVitalData && (lowerText.includes("sai") || lowerText.includes("nhầm") || lowerText.includes("đọc lại") || lowerText.includes("không phải"))) {
                 cancelBpLog();
                 return;
             }
 
-            // 3. Nếu cụ báo uống thuốc
-            if (lowerText.includes("uống rồi") || lowerText.includes("đã uống")) {
-                confirmTaken();
+            // Nếu cụ nói đã uống thuốc
+            if (lowerText.includes("uống rồi") || lowerText.includes("đã uống") || lowerText.includes("xong rồi")) {
+                const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/today`);
+                const meds = await res.json();
+                const pendingMed = meds.find(m => !m.is_taken) || meds[0];
+                if (pendingMed) {
+                    confirmTaken(pendingMed.medication_id, pendingMed.medicine_name);
+                }
                 return;
             }
 
-            // 4. Mặc định: Phân tích huyết áp
+            // Nếu cụ nói kêu cứu, khó thở, đau ngực
+            if (lowerText.includes("cấp cứu") || lowerText.includes("cứu") || lowerText.includes("đau ngực") || lowerText.includes("khó thở") || lowerText.includes("ngã")) {
+                triggerSosEmergency();
+                return;
+            }
+
+            // Mặc định: Phân tích huyết áp
             try {
                 const res = await fetch(`${API_BASE}/elderly/vitals/parse-voice`, {
                     method: "POST",
@@ -334,7 +381,7 @@
             }
         }
 
-        // BƯỚC 2: Cụ bấm ĐÚNG RỒI (hoặc nói 'Đúng rồi') -> Lưu chính thức vào DB
+        // BƯỚC 2: Cụ bấm ĐÚNG RỒI
         async function acceptBpLog() {
             if (!pendingVitalData) return;
             document.getElementById('bpConfirmBox').classList.add('hidden');
@@ -363,7 +410,35 @@
             speak(msg);
         }
 
-        window.onload = loadTodayMedications;
+        // KẾT NỐI WEBSOCKET THỜI GIAN THỰC ĐỂ NHẬN LỆNH TỰ ĐỘNG
+        function initWebSocket() {
+            const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const ws = new WebSocket(`${wsProtocol}//localhost:8000/ws`);
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.event === "MEDICATION_REMINDER") {
+                        document.getElementById('aiSpeechText').innerText = data.speech_prompt;
+                        speak(data.speech_prompt);
+                        loadTodayMedications();
+                    } else if (data.event === "MEDICATION_TAKEN" || data.event === "MEDICATION_UNDO") {
+                        loadTodayMedications();
+                    }
+                } catch (e) {
+                    console.log("WebSocket parse error:", e);
+                }
+            };
+
+            ws.onclose = () => {
+                setTimeout(initWebSocket, 3000);
+            };
+        }
+
+        window.onload = () => {
+            loadTodayMedications();
+            initWebSocket();
+        };
     </script>
 </body>
 </html>
