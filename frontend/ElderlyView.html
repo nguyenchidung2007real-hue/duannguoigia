@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnTam AI - Trợ Lý Cho Người Cao Tuổi</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #F8FAFC;
+        }
+        /* Cỡ chữ siêu lớn chống mắt mờ */
+        .text-elderly-title { font-size: 2.2rem; line-height: 2.6rem; }
+        .text-elderly-body { font-size: 1.6rem; line-height: 2.2rem; }
+        .text-elderly-btn { font-size: 1.8rem; font-weight: bold; }
+    </style>
+</head>
+<body class="p-4 md:p-8 max-w-2xl mx-auto min-h-screen flex flex-col justify-between">
+
+    <!-- 1. HEADER CHÀO HỎI & TRẠNG THÁI (CHỮ TO, RÕ RÀNG) -->
+    <header class="bg-white rounded-3xl p-6 shadow-md border-2 border-slate-200 mb-6 text-center">
+        <div class="flex items-center justify-center space-x-3 mb-2">
+            <span class="w-4 h-4 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-xl text-slate-500 font-semibold">AnTam AI đang lắng nghe</span>
+        </div>
+        <h1 class="text-elderly-title font-bold text-slate-800" id="greetingText">
+            Dạ thưa cụ Lan!
+        </h1>
+        <p class="text-xl text-slate-600 mt-1" id="currentDateText">
+            Hôm nay là Thứ Sáu, ngày 16 tháng 10
+        </p>
+    </header>
+
+    <!-- 2. THẺ NHẮC THUỐC TRỰC QUAN (NÚT XANH LÁ KHỔNG LỒ) -->
+    <main class="space-y-6 flex-grow flex flex-col justify-center">
+        
+        <div class="bg-amber-50 rounded-3xl p-6 border-4 border-amber-300 shadow-lg text-center" id="medCard">
+            <span class="inline-block bg-amber-200 text-amber-900 text-xl font-bold px-4 py-1 rounded-full mb-3">
+                ⏰ Cữ thuốc 08:00 Sáng
+            </span>
+            <h2 class="text-elderly-title font-bold text-amber-950 mb-2" id="medName">
+                Amlodipine 5mg
+            </h2>
+            <p class="text-elderly-body text-amber-800 mb-6">
+                👉 1 viên tròn nhỏ màu vàng (Uống sau ăn)
+            </p>
+
+            <!-- Nút bấm xác nhận ĐÃ UỐNG THUỐC -->
+            <button onclick="confirmTaken()" id="btnTakeMed" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-elderly-btn py-6 rounded-2xl shadow-xl flex items-center justify-center space-x-4 transition">
+                <i class="fa-solid fa-circle-check text-4xl"></i>
+                <span>BÀ ĐÃ UỐNG THUỐC</span>
+            </button>
+        </div>
+
+        <!-- 3. KHU VỰC PHẢN HỒI CỦA TRỢ LÝ AI (KÍNH NGỮ LỄ PHÉP) -->
+        <div class="bg-white rounded-3xl p-6 shadow-md border-2 border-slate-200" id="aiResponseBox">
+            <div class="flex items-start space-x-4">
+                <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600 text-3xl">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                </div>
+                <div>
+                    <p class="text-lg font-bold text-blue-600 mb-1">Lời nhắn của cháu AnTam:</p>
+                    <p class="text-elderly-body text-slate-800" id="aiSpeechText">
+                        "Dạ thưa cụ Lan, cụ nhớ uống viên thuốc huyết áp màu vàng rồi hẵng đi lại tập thể dục nhé ạ!"
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 4. KHU VỰC 2 NÚT THAO TÁC CỐ ĐỊNH PHÍA DƯỚI (NÓI & SOS) -->
+    <footer class="mt-8 space-y-4">
+        <!-- NÚT XANH DƯƠNG: BẤM ĐỂ NÓI (MICROPHONE) -->
+        <button id="btnVoice" onclick="toggleVoiceRecording()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-elderly-btn py-7 rounded-3xl shadow-xl flex items-center justify-center space-x-4 transition border-4 border-blue-400">
+            <i class="fa-solid fa-microphone text-4xl" id="micIcon"></i>
+            <span id="micText">BẤM VÀO ĐÂY ĐỂ NÓI</span>
+        </button>
+
+        <p class="text-center text-lg text-slate-500 font-medium">
+            (Cụ có thể nói: "Bà uống thuốc rồi", "Huyết áp 135 trên 85")
+        </p>
+    </footer>
+
+    <!-- JAVASCRIPT XỬ LÝ SỰ KIỆN & KẾT NỐI API -->
+    <script>
+        const API_BASE = "http://localhost:8000/api";
+        const ELDERLY_ID = "LAN_DEMO_ID"; 
+        let isRecording = false;
+        let recognition = null;
+
+        // Khởi tạo Text-to-Speech phát âm thanh ấm áp
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'vi-VN';
+                utterance.rate = 0.85; // Đọc chậm rãi, ấm áp cho người già
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // 1. Xác nhận đã uống thuốc
+        function confirmTaken() {
+            const btn = document.getElementById('btnTakeMed');
+            btn.className = "w-full bg-slate-400 text-white text-elderly-btn py-6 rounded-2xl shadow flex items-center justify-center space-x-4";
+            btn.innerHTML = `<i class="fa-solid fa-check-double text-4xl"></i><span>ĐÃ GHI NHẬN HÔM NAY</span>`;
+            
+            const reply = "Dạ con đã ghi nhận cụ uống thuốc rồi ạ. Cụ uống thêm một ngụm nước ấm cho trôi thuốc nhé!";
+            document.getElementById('aiSpeechText').innerText = reply;
+            speak(reply);
+
+            // Gửi API về backend
+            fetch(`${API_BASE}/elderly/LAN_DEMO/medications/AMLODIPINE/take`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ confirmation_method: "BUTTON_CLICK" })
+            }).catch(e => console.log("Demo local mode"));
+        }
+
+        // 2. Nhận diện giọng nói (Speech-to-Text)
+        function toggleVoiceRecording() {
+            const micBtn = document.getElementById('btnVoice');
+            const micText = document.getElementById('micText');
+            const micIcon = document.getElementById('micIcon');
+
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert("Trình duyệt chưa bật micro, cụ dùng Chrome giúp con nhé!");
+                return;
+            }
+
+            if (!isRecording) {
+                // Bắt đầu nghe
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.lang = 'vi-VN';
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                recognition.onstart = () => {
+                    isRecording = true;
+                    micBtn.className = "w-full bg-red-500 text-white text-elderly-btn py-7 rounded-3xl shadow-xl flex items-center justify-center space-x-4 animate-pulse border-4 border-red-300";
+                    micText.innerText = "ĐANG LẮNG NGHE CỤ NÓI...";
+                    micIcon.className = "fa-solid fa-circle-dot text-4xl";
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    handleVoiceCommand(transcript);
+                };
+
+                recognition.onerror = () => resetMicButton();
+                recognition.onend = () => resetMicButton();
+
+                recognition.start();
+            } else {
+                if (recognition) recognition.stop();
+                resetMicButton();
+            }
+        }
+
+        function resetMicButton() {
+            isRecording = false;
+            const micBtn = document.getElementById('btnVoice');
+            const micText = document.getElementById('micText');
+            const micIcon = document.getElementById('micIcon');
+            micBtn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white text-elderly-btn py-7 rounded-3xl shadow-xl flex items-center justify-center space-x-4 border-4 border-blue-400";
+            micText.innerText = "BẤM VÀO ĐÂY ĐỂ NÓI";
+            micIcon.className = "fa-solid fa-microphone text-4xl";
+        }
+
+        // 3. Xử lý câu nói của cụ (Đọc huyết áp hoặc báo uống thuốc)
+        function handleVoiceCommand(text) {
+            console.log("Câu cụ vừa nói:", text);
+            document.getElementById('aiSpeechText').innerText = `Cụ vừa nói: "${text}"`;
+
+            // Kiểm tra nếu cụ báo uống thuốc
+            if (text.toLowerCase().includes("uống rồi") || text.toLowerCase().includes("đã uống")) {
+                confirmTaken();
+                return;
+            }
+
+            // Gửi lên Backend kiểm tra Guardrail Huyết áp
+            fetch(`${API_BASE}/elderly/vitals/voice-log`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    elderly_id: "demo",
+                    raw_transcript: text
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('aiSpeechText').innerText = data.advice;
+                    speak(data.advice);
+                } else {
+                    const fallback = "Dạ con nghe thấy cụ nói rồi ạ. Cụ cần con nhắc thuốc hay đo huyết áp thì cụ cứ dặn con nhé!";
+                    document.getElementById('aiSpeechText').innerText = fallback;
+                    speak(fallback);
+                }
+            })
+            .catch(() => {
+                const fallback = "Dạ con đã nghe rõ lời cụ dặn rồi ạ!";
+                document.getElementById('aiSpeechText').innerText = fallback;
+                speak(fallback);
+            });
+        }
+    </script>
+</body>
+</html>

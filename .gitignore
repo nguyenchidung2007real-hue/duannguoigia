@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+elderly_care.db
+*.sqlite3
+.DS_Store
+.vscode/
+.idea/

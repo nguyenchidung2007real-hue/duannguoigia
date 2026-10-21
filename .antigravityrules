@@ -1,0 +1,18 @@
+# QUY TẮC CỐT LÕI DỰ ÁN TRỢ LÝ AI NGƯỜI CAO TUỔI (ZERO-FRICTION)
+
+1. Giao diện Người cao tuổi (`ElderlyView`):
+   - TUYỆT ĐỐI không có màn hình đăng nhập mật khẩu (sử dụng device_token hoặc mã ghép nối 6 số).
+   - Mọi cỡ chữ tối thiểu từ text-2xl (24px) trở lên, độ tương phản cao chuẩn WCAG AAA.
+   - Không sử dụng bất kỳ từ tiếng Anh nào trên giao diện người dùng (Ví dụ: không dùng "Submit", "Cancel", "Dashboard", "OK").
+   - Chỉ hiển thị 2-3 nút hành động chính chiếm toàn màn hình:
+     * Nút Xanh Lá (ĐÃ UỐNG THUỐC)
+     * Nút Xanh Dương (BẤM ĐỂ NÓI)
+     * Nút Đỏ (CẤP CỨU SOS - nếu kích hoạt)
+
+2. An toàn Y tế & Giọng nói (`Backend` & `AI`):
+   - Mọi câu trả lời từ AI đều phải bắt đầu bằng kính ngữ lễ phép ("Dạ thưa cụ...", "Dạ con nghe ạ...").
+   - Không bao giờ để LLM tự phán đoán mức độ nguy hiểm của huyết áp. Bắt buộc đi qua hàm `check_blood_pressure_guardrail(sys, dia, pulse)` bằng Python trước khi sinh câu trả lời.
+   - Khi nhận chỉ số huyết áp bằng giọng nói, luôn yêu cầu bước xác nhận (`PENDING_CONFIRMATION`) trước khi lưu chính thức vào Database.
+
+3. Xử lý Thời gian thực (`WebSocket`):
+   - Mọi tín hiệu cảnh báo (quá giờ uống thuốc không phản hồi, chỉ số huyết áp vượt ngưỡng nguy hiểm, hoặc bấm SOS) phải bắn sự kiện qua WebSocket về `FamilyDashboard` ngay lập tức.
