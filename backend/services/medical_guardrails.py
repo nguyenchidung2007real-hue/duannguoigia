@@ -26,16 +26,56 @@ def normalize_bp_value(val: float) -> int:
         return int(round(val * 10.0))
     return int(round(val))
 
+def parse_vietnamese_number_in_text(text: str) -> str:
+    """
+    Chuyển đổi số tiếng Việt viết bằng chữ (Chuẩn bị sẵn cho PhoWhisper ASR):
+    - 'một trăm ba mươi lăm' -> '135'
+    - 'tám mươi lăm' -> '85'
+    - 'một trăm tám mươi' -> '180'
+    """
+    units = {
+        'không': 0, 'một': 1, 'mốt': 1, 'hai': 2, 'ba': 3, 'bốn': 4, 'tư': 4, 
+        'năm': 5, 'lăm': 5, 'sáu': 6, 'bảy': 7, 'tám': 8, 'chín': 9
+    }
+    
+    def replace_full(m):
+        words = m.group(0).split()
+        val = 0
+        if len(words) >= 2 and words[1] == 'trăm':
+            u = units.get(words[0], 1)
+            val += u * 100
+            words = words[2:]
+            if words and words[0] in ['linh', 'lẻ']:
+                words = words[1:]
+        if len(words) >= 2 and words[1] in ['mươi', 'chục']:
+            u = units.get(words[0], 0)
+            val += u * 10
+            words = words[2:]
+        elif words and words[0] == 'mười':
+            val += 10
+            words = words[1:]
+        if words and words[0] in units:
+            val += units[words[0]]
+        return str(val) if val > 0 else m.group(0)
+
+    pattern = r'\b(?:(?:một|hai)\s+trăm(?:\s+(?:linh|lẻ)\s+(?:[1-9]|một|hai|ba|bốn|tư|năm|sáu|bảy|tám|chín)|(?:\s+(?:mười|[1-9]|hai|ba|bốn|năm|sáu|bảy|tám|chín)(?:\s+(?:mươi|chục))?(?:\s+(?:[1-9]|mốt|hai|ba|bốn|tư|lăm|năm|sáu|bảy|tám|chín))?)?)|(?:[1-9]|hai|ba|bốn|năm|sáu|bảy|tám|chín)\s+(?:mươi|chục)(?:\s+(?:[1-9]|mốt|hai|ba|bốn|tư|lăm|năm|sáu|bảy|tám|chín))?|mười(?:\s+(?:[1-9]|mốt|hai|ba|bốn|tư|lăm|năm|sáu|bảy|tám|chín))?)\b'
+    return re.sub(pattern, replace_full, text)
+
 def preprocess_voice_text(text: str) -> str:
     """
-    Tiền xử lý văn bản giọng nói tiếng Việt:
-    - "1 2 0 trên 80" -> "120 trên 80" (ghép các chữ số rời)
-    - "8 0" -> "80"
-    - "13 rưỡi", "13 phẩy 5", "13 phẩy năm" -> "13.5"
-    - Đổi dấu phẩy thành dấu chấm ("13,5" -> "13.5")
-    - Chỉ gộp khi số đằng sau là số 5 ("13 5" -> "13.5"), tuyệt đối KHÔNG gộp "13 8" hoặc "12 7"
+    Tiền xử lý văn bản giọng nói tiếng Việt (Hỗ trợ cả Chrome Web Speech và PhoWhisper):
+    - Đổi chữ số hàng trăm, hàng chục viết bằng chữ sang số ('một trăm ba mươi lăm' -> '135')
+    - '1 2 0 trên 80' -> '120 trên 80' (ghép các chữ số rời)
+    - '8 0' -> '80'
+    - '13 rưỡi', '13 phẩy 5', '13 phẩy năm' -> '13.5'
+    - Đổi dấu phẩy thành dấu chấm ('13,5' -> '13.5')
+    - Chỉ gộp khi số đằng sau là số 5 ('13 5' -> '13.5'), tuyệt đối KHÔNG gộp '13 8' hoặc '12 7'
     """
     t = text.lower()
+
+    # 0. Chuyển đổi số đầy đủ (Chuẩn bị sẵn cho PhoWhisper ASR)
+    t = parse_vietnamese_number_in_text(t)
+
     # 1. Đổi chữ số cơ bản nếu STT trả về chữ (Lưu ý: Không đổi 'không' thành '0' để tránh nhầm với từ phủ định 'không có')
     word_to_num = {
         "mười một": "11", "mười hai": "12", "mười ba": "13", "mười bốn": "14", 

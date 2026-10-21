@@ -26,3 +26,5 @@
   Mỗi khi chỉnh sửa Regex hoặc Logic trong `medical_guardrails.py` hoặc `main.py`, bắt buộc phải chạy lại bộ Test Suite 6 phần (Edge Cases Spacing, Physiological Bounds, Categories, 115 Protocol, Pulse Evaluation, Endpoint Logic) và đảm bảo PASS 100% trước khi đẩy code lên git.
 - **Rule 4 — Tiêu chuẩn Zero-Friction cho Mọi Tính năng Mới**:
   Mọi tính năng thêm vào `ElderlyView.html` không được phép yêu cầu gõ bàn phím, không dùng menu ẩn (dropdown/hamburger menu), kích thước chữ tối thiểu 1.6rem và mọi hành động ghi dữ liệu giọng nói đều phải qua bước xác nhận 2 chiều.
+- **Rule 5 — Phục hồi Sự cố AI (Graceful Fallback Rule)**:
+  Mọi module AI/ML (ASR, Intent, LLM, OCR) khi gặp lỗi, timeout (> 2 giây), hoặc độ tự tin (confidence score) thấp đều bắt buộc phải tự động fallback về luồng Rule-based trong `services/medical_guardrails.py`. Với các mức nguy kịch (Severity 3 và 4), tuyệt đối dùng template chuẩn y tế có nhắc gọi 115, không để LLM can thiệp làm trễ hoặc sai lệch nội dung khẩn cấp.

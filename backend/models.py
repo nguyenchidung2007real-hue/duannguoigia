@@ -1,8 +1,14 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from database import Base
+
+VN_TIMEZONE = timezone(timedelta(hours=7))
+
+def get_vn_now():
+    """Hàm lấy thời gian hiện tại theo múi giờ chuẩn Việt Nam (UTC+7)"""
+    return datetime.now(VN_TIMEZONE)
 
 def generate_uuid():
     return str(uuid.uuid4())
@@ -23,7 +29,7 @@ class ElderlyProfile(Base):
     pairing_code = Column(String(6), unique=True, index=True, nullable=False)
     emergency_qr_token = Column(String(64), unique=True, index=True, nullable=False)
     presence_status = Column(String(20), default="AT_HOME") # AT_HOME / AWAY_NO_PHONE
-    last_seen_at = Column(DateTime, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, default=get_vn_now)
 
     # Quan hệ
     medications = relationship("MedicationSchedule", back_populates="elderly", cascade="all, delete-orphan")
@@ -42,7 +48,7 @@ class FamilyMember(Base):
     relationship_type = Column(String(50), default="CON_TRAI") # CON_TRAI, CON_GAI, CHAU...
     is_primary_contact = Column(Boolean, default=True)
     fcm_device_token = Column(String(255), nullable=True) # Token gửi thông báo đẩy
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_vn_now)
 
     elderly = relationship("ElderlyProfile", back_populates="family_members")
 
@@ -58,9 +64,9 @@ class MedicationSchedule(Base):
     instructions = Column(String(150), default="Uống sau ăn")
     schedule_times = Column(JSON, nullable=False) # Danh sách giờ uống: ["08:00", "19:30"]
     raw_ocr_text = Column(Text, nullable=True) # Đoạn text OCR quét được từ đơn thuốc
-    verified_by_caregiver = Column(Boolean, default=True)
+    verified_by_caregiver = Column(Boolean, default=False) # AN TOÀN Y KHOA: Mặc định False (chưa duyệt), chỉ con cái duyệt mới kích hoạt
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_vn_now)
 
     elderly = relationship("ElderlyProfile", back_populates="medications")
     logs = relationship("MedicationLog", back_populates="medication", cascade="all, delete-orphan")
@@ -92,7 +98,7 @@ class VitalSign(Base):
     health_category = Column(String(30), nullable=False) # NORMAL, HIGH_NORMAL, HYPERTENSION_STAGE_1, HYPERTENSION_STAGE_2, CRITICAL_HIGH, HYPOTENSION_LOW, HYPOTENSION_MILD, CRITICAL_LOW, MIXED_DANGER
     input_source = Column(String(30), default="VOICE_INPUT")
     raw_voice_transcript = Column(Text, nullable=True) # Câu gốc: "Huyết áp hôm nay 135 trên 85"
-    measured_at = Column(DateTime, default=datetime.utcnow)
+    measured_at = Column(DateTime, default=get_vn_now)
 
     elderly = relationship("ElderlyProfile", back_populates="vitals")
 
@@ -102,14 +108,14 @@ class HealthAndSOSLog(Base):
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     elderly_id = Column(String(36), ForeignKey("elderly_profiles.id"), nullable=False)
-    trigger_source = Column(String(30), nullable=False) # RED_BUTTON, PHOBERT_VOICE, LOUD_NOISE, DEADMAN_MISSED, PUBLIC_QR_SCAN
+    trigger_source = Column(String(30), nullable=False) # RED_BUTTON, PHOBERT_VOICE, VITAL_CRITICAL, DEADMAN_MISSED, PUBLIC_QR_SCAN
     escalation_status = Column(String(30), default="TRIGGERED") # TRIGGERED, CHECKING_15S, BROADCASTED_FAMILY, RESOLVED
     raw_transcript = Column(Text, nullable=True)
     audio_clip_url = Column(String(255), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     location_note = Column(String(150), default="Tại nhà")
-    triggered_at = Column(DateTime, default=datetime.utcnow)
+    triggered_at = Column(DateTime, default=get_vn_now)
     resolved_at = Column(DateTime, nullable=True)
 
     elderly = relationship("ElderlyProfile", back_populates="sos_alerts")

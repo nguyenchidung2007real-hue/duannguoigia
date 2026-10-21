@@ -104,9 +104,11 @@ def pair_device(req: schemas.PairRequest, db: Session = Depends(get_db)):
 
 @app.get("/api/elderly/{elderly_id}/medications/today")
 def get_today_medications(elderly_id: str, db: Session = Depends(get_db)):
+    # AN TOÀN Y KHOA: Chỉ tải các đơn thuốc đã được con cái/bác sĩ xác nhận (verified_by_caregiver == True)
     meds = db.query(models.MedicationSchedule).filter(
         models.MedicationSchedule.elderly_id == elderly_id,
-        models.MedicationSchedule.is_active == True
+        models.MedicationSchedule.is_active == True,
+        models.MedicationSchedule.verified_by_caregiver == True
     ).all()
 
     today_start = datetime.combine(date.today(), datetime.min.time())
@@ -538,7 +540,8 @@ async def check_medication_schedules():
         today_start = datetime.combine(date.today(), datetime.min.time())
 
         active_meds = db.query(models.MedicationSchedule).filter(
-            models.MedicationSchedule.is_active == True
+            models.MedicationSchedule.is_active == True,
+            models.MedicationSchedule.verified_by_caregiver == True
         ).all()
 
         for med in active_meds:
@@ -643,7 +646,8 @@ def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
     today_start = datetime.combine(date.today(), datetime.min.time())
     total_meds = db.query(models.MedicationSchedule).filter(
         models.MedicationSchedule.elderly_id == elderly_id,
-        models.MedicationSchedule.is_active == True
+        models.MedicationSchedule.is_active == True,
+        models.MedicationSchedule.verified_by_caregiver == True
     ).count()
 
     taken_count = db.query(models.MedicationLog).filter(
@@ -709,7 +713,8 @@ def startup_seed_data():
             pill_color_shape="Viên tròn nhỏ màu vàng",
             dosage="1 viên",
             instructions="Uống sau ăn sáng",
-            schedule_times=["08:00"]
+            schedule_times=["08:00"],
+            verified_by_caregiver=True
         )
         thuoc_2 = models.MedicationSchedule(
             elderly_id=cụ_lan.id,
@@ -717,7 +722,8 @@ def startup_seed_data():
             pill_color_shape="Viên con nhộng trắng",
             dosage="1 viên",
             instructions="Uống sau ăn tối",
-            schedule_times=["19:30"]
+            schedule_times=["19:30"],
+            verified_by_caregiver=True
         )
         db.add_all([thuoc_1, thuoc_2])
 
@@ -728,6 +734,10 @@ def startup_seed_data():
         db.add_all([v1, v2, v3])
 
         db.commit()
+
+    # Đảm bảo các đơn thuốc mẫu đã được xác nhận (verified_by_caregiver = True)
+    db.query(models.MedicationSchedule).filter(models.MedicationSchedule.elderly_id == "lan_1952").update({"verified_by_caregiver": True})
+    db.commit()
 
     # Đảm bảo có thông tin người nhà liên hệ khẩn cấp
     con_trai = db.query(models.FamilyMember).filter(models.FamilyMember.elderly_id == "lan_1952").first()
