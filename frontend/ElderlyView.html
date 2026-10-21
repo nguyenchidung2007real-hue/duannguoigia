@@ -4,15 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AnTam AI - Trợ Lý Cho Người Cao Tuổi</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #F8FAFC;
+            background-color: #F1F5F9;
         }
-        /* Cỡ chữ siêu lớn chống mắt mờ */
         .text-elderly-title { font-size: 2.2rem; line-height: 2.6rem; }
         .text-elderly-body { font-size: 1.6rem; line-height: 2.2rem; }
         .text-elderly-btn { font-size: 1.8rem; font-weight: bold; }
@@ -20,108 +18,212 @@
 </head>
 <body class="p-4 md:p-8 max-w-2xl mx-auto min-h-screen flex flex-col justify-between">
 
-    <!-- 1. HEADER CHÀO HỎI & TRẠNG THÁI (CHỮ TO, RÕ RÀNG) -->
-    <header class="bg-white rounded-3xl p-6 shadow-md border-2 border-slate-200 mb-6 text-center">
+    <!-- 1. HEADER CHÀO HỎI & TRẠNG THÁI -->
+    <header class="bg-white rounded-3xl p-6 shadow-md border-2 border-slate-200 mb-4 text-center">
         <div class="flex items-center justify-center space-x-3 mb-2">
             <span class="w-4 h-4 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="text-xl text-slate-500 font-semibold">AnTam AI đang lắng nghe</span>
+            <span class="text-xl text-slate-500 font-semibold" id="systemStatus">Hệ thống đang hoạt động tốt</span>
         </div>
         <h1 class="text-elderly-title font-bold text-slate-800" id="greetingText">
             Dạ thưa cụ Lan!
         </h1>
         <p class="text-xl text-slate-600 mt-1" id="currentDateText">
-            Hôm nay là Thứ Sáu, ngày 16 tháng 10
+            Hôm nay là cữ thuốc và đo huyết áp định kỳ
         </p>
     </header>
 
-    <!-- 2. THẺ NHẮC THUỐC TRỰC QUAN (NÚT XANH LÁ KHỔNG LỒ) -->
-    <main class="space-y-6 flex-grow flex flex-col justify-center">
+    <!-- 2. THẺ NHẮC THUỐC TRỰC QUAN (CHỐNG BẤM ĐÚP + NÚT HOÀN TÁC) -->
+    <main class="space-y-4 flex-grow flex flex-col justify-center">
         
         <div class="bg-amber-50 rounded-3xl p-6 border-4 border-amber-300 shadow-lg text-center" id="medCard">
-            <span class="inline-block bg-amber-200 text-amber-900 text-xl font-bold px-4 py-1 rounded-full mb-3">
+            <span class="inline-block bg-amber-200 text-amber-900 text-xl font-bold px-4 py-1 rounded-full mb-3" id="medTimeTag">
                 ⏰ Cữ thuốc 08:00 Sáng
             </span>
             <h2 class="text-elderly-title font-bold text-amber-950 mb-2" id="medName">
                 Amlodipine 5mg
             </h2>
-            <p class="text-elderly-body text-amber-800 mb-6">
+            <p class="text-elderly-body text-amber-800 mb-6" id="medDesc">
                 👉 1 viên tròn nhỏ màu vàng (Uống sau ăn)
             </p>
 
             <!-- Nút bấm xác nhận ĐÃ UỐNG THUỐC -->
             <button onclick="confirmTaken()" id="btnTakeMed" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-elderly-btn py-6 rounded-2xl shadow-xl flex items-center justify-center space-x-4 transition">
                 <i class="fa-solid fa-circle-check text-4xl"></i>
-                <span>BÀ ĐÃ UỐNG THUỐC</span>
+                <span id="takeMedBtnText">BÀ ĐÃ UỐNG THUỐC</span>
             </button>
+
+            <!-- Nút bấm hoàn tác trong 15s nếu cụ lỡ bấm nhầm -->
+            <div id="undoContainer" class="hidden mt-3">
+                <button onclick="undoTaken()" class="bg-amber-200 hover:bg-amber-300 text-amber-900 text-lg font-bold px-6 py-2 rounded-xl border border-amber-400">
+                    <i class="fa-solid fa-rotate-left mr-2"></i> Bấm nhầm? Bấm vào đây để Hoàn tác (<span id="undoCountdown">15</span>s)
+                </button>
+            </div>
         </div>
 
-        <!-- 3. KHU VỰC PHẢN HỒI CỦA TRỢ LÝ AI (KÍNH NGỮ LỄ PHÉP) -->
+        <!-- 3. KHU VỰC PHẢN HỒI & XÁC NHẬN HUYẾT ÁP (TWO-PHASE CONFIRMATION) -->
         <div class="bg-white rounded-3xl p-6 shadow-md border-2 border-slate-200" id="aiResponseBox">
             <div class="flex items-start space-x-4">
                 <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600 text-3xl">
                     <i class="fa-solid fa-heart-pulse"></i>
                 </div>
-                <div>
+                <div class="flex-grow">
                     <p class="text-lg font-bold text-blue-600 mb-1">Lời nhắn của cháu AnTam:</p>
                     <p class="text-elderly-body text-slate-800" id="aiSpeechText">
-                        "Dạ thưa cụ Lan, cụ nhớ uống viên thuốc huyết áp màu vàng rồi hẵng đi lại tập thể dục nhé ạ!"
+                        "Dạ thưa cụ Lan, cụ nhớ uống viên thuốc huyết áp màu vàng rồi hẵng đi lại nhé ạ!"
                     </p>
+
+                    <!-- Khung xác nhận Huyết áp 2 bước -->
+                    <div id="bpConfirmBox" class="hidden mt-4 pt-4 border-t-2 border-slate-100">
+                        <div class="bg-blue-50 p-4 rounded-2xl border border-blue-200 mb-4 text-center">
+                            <span class="text-xl text-slate-600">Chỉ số đo được:</span>
+                            <div class="text-4xl font-extrabold text-blue-700 mt-1" id="pendingBpValue">
+                                135 / 85
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="acceptBpLog()" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-2xl py-4 rounded-xl shadow-lg flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-check"></i>
+                                <span>ĐÚNG RỒI</span>
+                            </button>
+                            <button onclick="cancelBpLog()" class="bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold text-2xl py-4 rounded-xl flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-xmark"></i>
+                                <span>ĐỌC LẠI</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
     </main>
 
-    <!-- 4. KHU VỰC 2 NÚT THAO TÁC CỐ ĐỊNH PHÍA DƯỚI (NÓI & SOS) -->
-    <footer class="mt-8 space-y-4">
-        <!-- NÚT XANH DƯƠNG: BẤM ĐỂ NÓI (MICROPHONE) -->
+    <!-- 4. KHU VỰC NÚT BẤM ĐỂ NÓI PHÍA DƯỚI -->
+    <footer class="mt-6 space-y-3">
         <button id="btnVoice" onclick="toggleVoiceRecording()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-elderly-btn py-7 rounded-3xl shadow-xl flex items-center justify-center space-x-4 transition border-4 border-blue-400">
             <i class="fa-solid fa-microphone text-4xl" id="micIcon"></i>
             <span id="micText">BẤM VÀO ĐÂY ĐỂ NÓI</span>
         </button>
 
-        <p class="text-center text-lg text-slate-500 font-medium">
-            (Cụ có thể nói: "Bà uống thuốc rồi", "Huyết áp 135 trên 85")
+        <p class="text-center text-lg text-slate-600 font-medium">
+            💡 Cụ có thể nói: <b>"13 rưỡi trên 8 rưỡi"</b> hoặc <b>"Bà uống rồi"</b>
         </p>
     </footer>
 
-    <!-- JAVASCRIPT XỬ LÝ SỰ KIỆN & KẾT NỐI API -->
     <script>
         const API_BASE = "http://localhost:8000/api";
-        const ELDERLY_ID = "LAN_DEMO_ID"; 
+        let elderlyId = "lan_1952";
+        let currentMedId = null;
+        let lastLogId = null;
+        let undoTimer = null;
         let isRecording = false;
         let recognition = null;
+        let pendingVitalData = null;
 
-        // Khởi tạo Text-to-Speech phát âm thanh ấm áp
         function speak(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'vi-VN';
-                utterance.rate = 0.85; // Đọc chậm rãi, ấm áp cho người già
+                utterance.rate = 0.85;
                 window.speechSynthesis.speak(utterance);
             }
         }
 
-        // 1. Xác nhận đã uống thuốc
-        function confirmTaken() {
-            const btn = document.getElementById('btnTakeMed');
-            btn.className = "w-full bg-slate-400 text-white text-elderly-btn py-6 rounded-2xl shadow flex items-center justify-center space-x-4";
-            btn.innerHTML = `<i class="fa-solid fa-check-double text-4xl"></i><span>ĐÃ GHI NHẬN HÔM NAY</span>`;
-            
-            const reply = "Dạ con đã ghi nhận cụ uống thuốc rồi ạ. Cụ uống thêm một ngụm nước ấm cho trôi thuốc nhé!";
-            document.getElementById('aiSpeechText').innerText = reply;
-            speak(reply);
+        async function loadTodayMedications() {
+            try {
+                const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/today`);
+                const meds = await res.json();
+                if (meds && meds.length > 0) {
+                    const m = meds[0];
+                    currentMedId = m.medication_id;
+                    document.getElementById('medName').innerText = m.medicine_name;
+                    document.getElementById('medDesc').innerText = `👉 ${m.dosage} - ${m.pill_color_shape} (${m.instructions})`;
+                    document.getElementById('medTimeTag').innerText = `⏰ Cữ thuốc ${m.schedule_times[0]}`;
 
-            // Gửi API về backend
-            fetch(`${API_BASE}/elderly/LAN_DEMO/medications/AMLODIPINE/take`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ confirmation_method: "BUTTON_CLICK" })
-            }).catch(e => console.log("Demo local mode"));
+                    if (m.is_taken) {
+                        setTakenUI(m.taken_time || "hôm nay");
+                    }
+                }
+            } catch (e) {
+                console.log("Offline mode");
+            }
         }
 
-        // 2. Nhận diện giọng nói (Speech-to-Text)
+        function setTakenUI(timeStr) {
+            const btn = document.getElementById('btnTakeMed');
+            btn.className = "w-full bg-slate-400 text-white text-elderly-btn py-6 rounded-2xl shadow flex items-center justify-center space-x-4 cursor-not-allowed";
+            btn.innerHTML = `<i class="fa-solid fa-check-double text-4xl"></i><span>ĐÃ UỐNG LÚC ${timeStr}</span>`;
+            btn.disabled = true;
+        }
+
+        async function confirmTaken() {
+            const btn = document.getElementById('btnTakeMed');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/${currentMedId || 'sample'}/take`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ confirmation_method: "BUTTON_CLICK" })
+                });
+                const data = await res.json();
+                
+                const nowStr = new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
+                setTakenUI(nowStr);
+                
+                document.getElementById('aiSpeechText').innerText = data.message;
+                speak(data.message);
+
+                if (data.log_id) {
+                    lastLogId = data.log_id;
+                    showUndoButton();
+                }
+            } catch (err) {
+                setTakenUI("hôm nay");
+                const fallback = "Dạ con đã ghi nhận cụ uống thuốc rồi ạ. Cụ uống thêm ngụm nước ấm nhé!";
+                document.getElementById('aiSpeechText').innerText = fallback;
+                speak(fallback);
+            }
+        }
+
+        function showUndoButton() {
+            const container = document.getElementById('undoContainer');
+            const countdownSpan = document.getElementById('undoCountdown');
+            container.classList.remove('hidden');
+            let timeLeft = 15;
+            countdownSpan.innerText = timeLeft;
+
+            clearInterval(undoTimer);
+            undoTimer = setInterval(() => {
+                timeLeft--;
+                countdownSpan.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(undoTimer);
+                    container.classList.add('hidden');
+                }
+            }, 1000);
+        }
+
+        async function undoTaken() {
+            clearInterval(undoTimer);
+            document.getElementById('undoContainer').classList.add('hidden');
+
+            if (lastLogId) {
+                await fetch(`${API_BASE}/elderly/medications/log/${lastLogId}/undo`, { method: "POST" });
+            }
+
+            const btn = document.getElementById('btnTakeMed');
+            btn.disabled = false;
+            btn.className = "w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-elderly-btn py-6 rounded-2xl shadow-xl flex items-center justify-center space-x-4 transition";
+            btn.innerHTML = `<i class="fa-solid fa-circle-check text-4xl"></i><span>BÀ ĐÃ UỐNG THUỐC</span>`;
+            
+            const msg = "Dạ con đã hoàn tác lại rồi ạ, cụ nhớ uống thuốc đúng giờ nhé!";
+            document.getElementById('aiSpeechText').innerText = msg;
+            speak(msg);
+        }
+
+        // Bật mic lắng nghe
         function toggleVoiceRecording() {
             const micBtn = document.getElementById('btnVoice');
             const micText = document.getElementById('micText');
@@ -133,7 +235,6 @@
             }
 
             if (!isRecording) {
-                // Bắt đầu nghe
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRecognition();
                 recognition.lang = 'vi-VN';
@@ -172,43 +273,81 @@
             micIcon.className = "fa-solid fa-microphone text-4xl";
         }
 
-        // 3. Xử lý câu nói của cụ (Đọc huyết áp hoặc báo uống thuốc)
-        function handleVoiceCommand(text) {
-            console.log("Câu cụ vừa nói:", text);
+        // Xử lý câu nói (BƯỚC 1: Parse & Hỏi xác nhận)
+        async function handleVoiceCommand(text) {
             document.getElementById('aiSpeechText').innerText = `Cụ vừa nói: "${text}"`;
 
-            // Kiểm tra nếu cụ báo uống thuốc
             if (text.toLowerCase().includes("uống rồi") || text.toLowerCase().includes("đã uống")) {
                 confirmTaken();
                 return;
             }
 
-            // Gửi lên Backend kiểm tra Guardrail Huyết áp
-            fetch(`${API_BASE}/elderly/vitals/voice-log`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    elderly_id: "demo",
-                    raw_transcript: text
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('aiSpeechText').innerText = data.advice;
-                    speak(data.advice);
+            try {
+                const res = await fetch(`${API_BASE}/elderly/vitals/parse-voice`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        elderly_id: elderlyId,
+                        raw_transcript: text
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.success && data.need_confirmation) {
+                    pendingVitalData = {
+                        elderly_id: elderlyId,
+                        systolic: data.systolic,
+                        diastolic: data.diastolic,
+                        heart_rate: data.heart_rate,
+                        raw_transcript: text
+                    };
+
+                    document.getElementById('pendingBpValue').innerText = `${data.systolic} / ${data.diastolic} mmHg`;
+                    document.getElementById('bpConfirmBox').classList.remove('hidden');
+
+                    document.getElementById('aiSpeechText').innerText = data.confirm_prompt;
+                    speak(data.confirm_prompt);
                 } else {
-                    const fallback = "Dạ con nghe thấy cụ nói rồi ạ. Cụ cần con nhắc thuốc hay đo huyết áp thì cụ cứ dặn con nhé!";
-                    document.getElementById('aiSpeechText').innerText = fallback;
-                    speak(fallback);
+                    document.getElementById('aiSpeechText').innerText = data.message;
+                    speak(data.message);
                 }
-            })
-            .catch(() => {
-                const fallback = "Dạ con đã nghe rõ lời cụ dặn rồi ạ!";
+            } catch (err) {
+                const fallback = "Dạ con đã nghe lời cụ dặn rồi ạ!";
                 document.getElementById('aiSpeechText').innerText = fallback;
                 speak(fallback);
-            });
+            }
         }
+
+        // BƯỚC 2: Cụ bấm ĐÚNG RỒI -> Lưu chính thức vào DB
+        async function acceptBpLog() {
+            if (!pendingVitalData) return;
+            document.getElementById('bpConfirmBox').classList.add('hidden');
+
+            try {
+                const res = await fetch(`${API_BASE}/elderly/vitals/confirm-log`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(pendingVitalData)
+                });
+                const data = await res.json();
+
+                document.getElementById('aiSpeechText').innerText = data.message;
+                speak(data.message);
+                pendingVitalData = null;
+            } catch (e) {
+                alert("Lỗi kết nối tới máy chủ.");
+            }
+        }
+
+        function cancelBpLog() {
+            document.getElementById('bpConfirmBox').classList.add('hidden');
+            pendingVitalData = null;
+            const msg = "Dạ vâng, cụ đo lại rồi bấm mic đọc lại giúp con nhé ạ!";
+            document.getElementById('aiSpeechText').innerText = msg;
+            speak(msg);
+        }
+
+        window.onload = loadTodayMedications;
     </script>
 </body>
 </html>

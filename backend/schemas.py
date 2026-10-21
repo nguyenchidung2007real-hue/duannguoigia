@@ -32,7 +32,7 @@ class MedicationCreate(BaseModel):
     pill_color_shape: Optional[str] = "Viên thuốc tròn"
     dosage: str = "1 viên"
     instructions: str = "Uống sau ăn"
-    schedule_times: List[str] = ["08:00"] # ["08:00", "19:00"]
+    schedule_times: List[str] = ["08:00"]
 
 class MedicationResponse(MedicationCreate):
     id: str
@@ -44,15 +44,20 @@ class MedicationResponse(MedicationCreate):
 
 # Schema Xác nhận đã uống thuốc
 class MedicationTakeRequest(BaseModel):
-    confirmation_method: str = "BUTTON_CLICK" # BUTTON_CLICK hoặc VOICE_CONFIRMED
+    confirmation_method: str = "BUTTON_CLICK"
 
-# Schema Chỉ số Huyết áp
-class VitalSignVoiceInput(BaseModel):
+# Schema Phân tích Giọng nói (Bước 1: Parse & Validate, chưa lưu)
+class VitalSignParseInput(BaseModel):
     elderly_id: str
-    raw_transcript: str # Câu cụ đọc: "Huyết áp 135 trên 85, nhịp tim 75"
-    systolic: Optional[float] = None
-    diastolic: Optional[float] = None
+    raw_transcript: str
+
+# Schema Lưu chính thức sau khi Cụ xác nhận (Bước 2: Confirm & Commit)
+class VitalSignConfirmInput(BaseModel):
+    elderly_id: str
+    systolic: float
+    diastolic: float
     heart_rate: Optional[float] = None
+    raw_transcript: Optional[str] = None
 
 class VitalSignResponse(BaseModel):
     id: str
@@ -61,7 +66,6 @@ class VitalSignResponse(BaseModel):
     diastolic: float
     heart_rate: Optional[float]
     health_category: str
-    advice: str
     measured_at: datetime
 
     class Config:

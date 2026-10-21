@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnTam AI - Bảng Điều Khiển Gia Đình (Caregiver Dashboard)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <!-- THANH ĐIỀU HƯỚNG TRÊN -->
+    <nav class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xl font-bold">
+                <i class="fa-solid fa-heart-pulse"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-xl text-slate-800">AnTam AI - Family Hub</h1>
+                <p class="text-xs text-slate-500">Giám sát & Chăm sóc sức khỏe người thân từ xa</p>
+            </div>
+        </div>
+
+        <!-- Trạng thái kết nối WebSocket Real-time -->
+        <div class="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+            <span class="w-3 h-3 rounded-full bg-emerald-500" id="wsDot"></span>
+            <span class="text-sm font-medium text-slate-600" id="wsText">Đang kết nối Real-time</span>
+        </div>
+    </nav>
+
+    <!-- NỘI DUNG CHÍNH CỦA DASHBOARD -->
+    <main class="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+
+        <!-- 1. THẺ THÔNG TIN HỒ SƠ NGƯỜI THÂN -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center space-x-4">
+                <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-3xl font-bold">
+                    👵
+                </div>
+                <div>
+                    <div class="flex items-center space-x-3">
+                        <h2 class="text-2xl font-bold text-slate-900" id="profileName">Bà Nguyễn Thị Lan</h2>
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Năm sinh: 1952 (74 tuổi)</span>
+                    </div>
+                    <p class="text-sm text-slate-600 mt-1" id="profileHistory">Bệnh nền: Tăng huyết áp vô căn, thoái hóa khớp gối nhẹ</p>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-center">
+                <span class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Mã Ghép Nối Không Mật Khẩu</span>
+                <p class="text-2xl font-extrabold text-blue-600 tracking-widest mt-0.5" id="profilePairingCode">123456</p>
+            </div>
+        </div>
+
+        <!-- 2. CÁC CHỈ SỐ THỐNG KÊ NHANH (CARDS) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Card 1: Huyết áp mới nhất -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-slate-500">Huyết áp đo gần nhất</span>
+                    <i class="fa-solid fa-heart-pulse text-rose-500 text-xl"></i>
+                </div>
+                <div class="flex items-baseline space-x-2">
+                    <span class="text-4xl font-extrabold text-slate-900" id="statBpValue">-- / --</span>
+                    <span class="text-sm text-slate-500">mmHg</span>
+                </div>
+                <div class="mt-3 flex items-center justify-between">
+                    <span class="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800" id="statBpTag">ỔN ĐỊNH</span>
+                    <span class="text-xs text-slate-400" id="statBpTime">Vừa cập nhật</span>
+                </div>
+            </div>
+
+            <!-- Card 2: Tuân thủ uống thuốc -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-slate-500">Uống thuốc hôm nay</span>
+                    <i class="fa-solid fa-pills text-blue-500 text-xl"></i>
+                </div>
+                <div class="flex items-baseline space-x-2">
+                    <span class="text-4xl font-extrabold text-blue-600" id="statMedRate">100%</span>
+                    <span class="text-sm text-slate-500" id="statMedCount">(Đã uống 1/1 cữ)</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 mt-4">
+                    <div class="bg-blue-600 h-2 rounded-full" id="statMedBar" style="width: 100%"></div>
+                </div>
+            </div>
+
+            <!-- Card 3: Trạng thái hiện diện -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-slate-500">Vị trí & An toàn</span>
+                    <i class="fa-solid fa-shield-halved text-emerald-500 text-xl"></i>
+                </div>
+                <div class="flex items-center space-x-2 mt-1">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    <span class="text-xl font-bold text-slate-800">Đang ở nhà an toàn</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">Thiết bị cắm sạc & Loa nhắc sẵn sàng</p>
+            </div>
+        </div>
+
+        <!-- 3. BIỂU ĐỒ THEO DÕI HUYẾT ÁP THEO THỜI GIAN -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-900">Biểu Đồ Xu Hướng Huyết Áp (Tâm thu / Tâm trương)</h3>
+                    <p class="text-xs text-slate-500">Dữ liệu được lưu tự động mỗi khi cụ đọc giọng nói</p>
+                </div>
+                <span class="text-xs bg-slate-100 px-3 py-1 rounded-lg text-slate-600 font-medium">Theo dõi tuần này</span>
+            </div>
+            <div class="h-64">
+                <canvas id="bpChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 4. NHẬT KÝ SỰ KIỆN REAL-TIME (LOGS) -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <h3 class="font-bold text-lg text-slate-900 mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-bell text-amber-500"></i>
+                <span>Nhật Ký Hoạt Động Thời Gian Thực (Live Events)</span>
+            </h3>
+
+            <div class="space-y-3" id="liveLogsContainer">
+                <!-- Log mẫu -->
+                <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                    <div class="flex items-center space-x-3">
+                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                        <span class="text-sm font-medium text-slate-700">Khởi tạo phiên giám sát cho Bà Nguyễn Thị Lan</span>
+                    </div>
+                    <span class="text-xs text-slate-400">Vừa xong</span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const API_BASE = "http://localhost:8000/api";
+        const WS_URL = "ws://localhost:8000/ws";
+        const elderlyId = "lan_1952";
+        let bpChartInstance = null;
+        let ws = null;
+
+        // 1. Tự động kết nối lại WebSocket nếu đứt kết nối ngầm (Auto-Reconnect)
+        function connectWebSocket() {
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                document.getElementById('wsDot').className = "w-3 h-3 rounded-full bg-emerald-500 animate-pulse";
+                document.getElementById('wsText').innerText = "Real-time đang kết nối";
+                // Khi kết nối thành công, tải lại dữ liệu mới nhất
+                loadDashboardData();
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleRealtimeEvent(data);
+            };
+
+            ws.onclose = () => {
+                document.getElementById('wsDot').className = "w-3 h-3 rounded-full bg-rose-500";
+                document.getElementById('wsText').innerText = "Mất kết nối - Thử lại sau 3s...";
+                setTimeout(connectWebSocket, 3000); // Tự kết nối lại sau 3s
+            };
+
+            ws.onerror = () => ws.close();
+        }
+
+        // 2. Xử lý sự kiện Real-time nhận được từ máy cụ
+        function handleRealtimeEvent(event) {
+            console.log("WebSocket event:", event);
+            const container = document.getElementById('liveLogsContainer');
+
+            let logHtml = "";
+            if (event.event === "MEDICATION_TAKEN") {
+                logHtml = `
+                    <div class="flex items-center justify-between p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 animate-bounce">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                            <span class="text-sm font-bold text-emerald-800">✅ Cụ vừa uống thuốc: ${event.medicine_name}</span>
+                        </div>
+                        <span class="text-xs text-emerald-600 font-semibold">${event.time}</span>
+                    </div>
+                `;
+                playNotificationSound();
+            } else if (event.event === "VITAL_LOGGED") {
+                const isDanger = event.is_emergency;
+                const bgClass = isDanger ? "bg-rose-50 border-rose-300" : "bg-blue-50 border-blue-200";
+                const textClass = isDanger ? "text-rose-800" : "text-blue-800";
+                const dotClass = isDanger ? "bg-rose-600 animate-ping" : "bg-blue-500";
+
+                logHtml = `
+                    <div class="flex items-center justify-between p-3.5 ${bgClass} rounded-xl border ${isDanger ? 'animate-pulse' : ''}">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-2.5 h-2.5 rounded-full ${dotClass}"></span>
+                            <span class="text-sm font-bold ${textClass}">🩺 Cụ vừa đo huyết áp: ${event.systolic}/${event.diastolic} mmHg (${event.title})</span>
+                        </div>
+                        <span class="text-xs text-slate-500">${event.time}</span>
+                    </div>
+                `;
+                playNotificationSound();
+            }
+
+            if (logHtml) {
+                container.insertAdjacentHTML('afterbegin', logHtml);
+                loadDashboardData(); // Cập nhật lại biểu đồ và card
+            }
+        }
+
+        function playNotificationSound() {
+            // Âm chuông báo nhẹ
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.2);
+        }
+
+        // 3. Tải toàn bộ dữ liệu thống kê & biểu đồ
+        async function loadDashboardData() {
+            try {
+                // Tóm tắt
+                const sumRes = await fetch(`${API_BASE}/family/summary/${elderlyId}`);
+                const sumData = await sumRes.json();
+
+                if (sumData.latest_vital && sumData.latest_vital.systolic) {
+                    document.getElementById('statBpValue').innerText = `${sumData.latest_vital.systolic}/${sumData.latest_vital.diastolic}`;
+                    document.getElementById('statBpTime').innerText = sumData.latest_vital.time || "Gần đây";
+                    
+                    const cat = sumData.latest_vital.category;
+                    const tag = document.getElementById('statBpTag');
+                    if (cat.includes("CRITICAL")) {
+                        tag.className = "text-xs px-2.5 py-1 rounded-full font-bold bg-rose-100 text-rose-800 animate-pulse";
+                        tag.innerText = "NGUY HIỂM";
+                    } else if (cat.includes("STAGE") || cat.includes("LOW")) {
+                        tag.className = "text-xs px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800";
+                        tag.innerText = "CẦN CHÚ Ý";
+                    } else {
+                        tag.className = "text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800";
+                        tag.innerText = "ỔN ĐỊNH";
+                    }
+                }
+
+                // Lịch sử biểu đồ
+                const vitalsRes = await fetch(`${API_BASE}/elderly/${elderlyId}/vitals/history`);
+                const vitalsHistory = await vitalsRes.json();
+                renderChart(vitalsHistory);
+
+            } catch (err) {
+                console.log("Error loading dashboard data:", err);
+            }
+        }
+
+        // 4. Vẽ biểu đồ Chart.js
+        function renderChart(records) {
+            const labels = records.map(r => r.measured_at);
+            const systolicData = records.map(r => r.systolic);
+            const diastolicData = records.map(r => r.diastolic);
+
+            const ctx = document.getElementById('bpChart').getContext('2d');
+
+            if (bpChartInstance) {
+                bpChartInstance.destroy();
+            }
+
+            bpChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Tâm thu (Số trên)',
+                            data: systolicData,
+                            borderColor: '#EF4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.3,
+                            fill: true,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Tâm trương (Số dưới)',
+                            data: diastolicData,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.3,
+                            fill: true,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 50,
+                            max: 190,
+                            grid: { color: '#E2E8F0' }
+                        }
+                    }
+                }
+            });
+        }
+
+        window.onload = () => {
+            connectWebSocket();
+        };
+    </script>
+</body>
+</html>
