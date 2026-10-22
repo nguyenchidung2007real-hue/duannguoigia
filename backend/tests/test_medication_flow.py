@@ -44,8 +44,8 @@ def test_medication_flow():
         fam_data = res_fam.json()
         assert fam_data["medication_stats"]["taken_today"] >= 1
 
-        # 5. Undo take medication
-        res_undo = client.post(f"/api/elderly/medications/log/{log_id}/undo")
+        # 5. Undo take medication (scoped by elderly_id)
+        res_undo = client.post(f"/api/elderly/lan_1952/medications/log/{log_id}/undo")
         assert res_undo.status_code == 200
 
         # 6. Verify undone

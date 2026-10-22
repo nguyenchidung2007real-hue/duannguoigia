@@ -1,9 +1,11 @@
 from typing import Dict, List, Optional
+from collections import deque
 from sqlalchemy.orm import Session
 import models
 
 # ponytail: in-memory alert log & console dispatcher, upgrade to Zalo ZNS / Twilio SMS / FCM SDK khi cấu hình API key nhà mạng
-DISPATCHED_NOTIFICATIONS: List[Dict] = []
+# M4: deque maxlen=1000 để giới hạn bộ nhớ (không tăng vô hạn theo thời gian)
+DISPATCHED_NOTIFICATIONS: deque = deque(maxlen=1000)
 
 def dispatch_family_alert(
     elderly_id: str,

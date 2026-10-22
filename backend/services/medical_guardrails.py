@@ -158,6 +158,7 @@ def evaluate_blood_pressure(systolic: float, diastolic: float, pulse: float = No
     # 4. Kiểm tra và đánh giá nhịp tim (pulse) nếu có
     pulse_note = ""
     pulse_status = "NORMAL"
+    pulse_is_emergency = False
     if pulse is not None:
         if pulse < 30 or pulse > 220:
             return {
@@ -170,12 +171,20 @@ def evaluate_blood_pressure(systolic: float, diastolic: float, pulse: float = No
                 "is_emergency": False,
                 "advice": f"Chỉ số nhịp tim ({int(pulse)} nhịp/phút) nằm ngoài giới hạn sinh lý đo lường thông thường (30 - 220 nhịp/phút). Cụ kiểm tra lại máy đo và đọc lại giúp con nhé ạ!"
             }
+        elif pulse > 150:
+            pulse_status = "TACHYCARDIA_CRITICAL"
+            pulse_note = f" ⚠️ Nhịp tim nguy kịch quá nhanh ({int(pulse)} nhịp/phút) — cần gọi cấp cứu ngay!"
+            pulse_is_emergency = True
         elif pulse > 120:
             pulse_status = "TACHYCARDIA_HIGH"
             pulse_note = f" Nhịp tim của cụ đang khá nhanh ({int(pulse)} nhịp/phút), cụ chú ý thả lỏng và hít thở thật sâu nhé ạ."
         elif pulse > 100:
             pulse_status = "TACHYCARDIA"
             pulse_note = f" Nhịp tim {int(pulse)} nhịp/phút (hơi nhanh nhẹ)."
+        elif pulse < 40:
+            pulse_status = "BRADYCARDIA_CRITICAL"
+            pulse_note = f" ⚠️ Nhịp tim nguy kịch quá chậm ({int(pulse)} nhịp/phút) — cần gọi cấp cứu ngay!"
+            pulse_is_emergency = True
         elif pulse < 50:
             pulse_status = "BRADYCARDIA_LOW"
             pulse_note = f" Nhịp tim của cụ đang khá chậm ({int(pulse)} nhịp/phút), cụ chú ý nghỉ ngơi nhé ạ."
@@ -278,6 +287,6 @@ def evaluate_blood_pressure(systolic: float, diastolic: float, pulse: float = No
         "diastolic": diastolic,
         "pulse": pulse,
         "pulse_status": pulse_status,
-        "is_emergency": (max_severity == 4),
+        "is_emergency": (max_severity == 4) or pulse_is_emergency,  # M6: pulse critical (<40 / >150) cũng trigger SOS
         "advice": advice
     }

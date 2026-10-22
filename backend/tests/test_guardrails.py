@@ -460,8 +460,8 @@ class TestAnTamMedicalGuardrails(unittest.TestCase):
         med_names_before = [m["medicine_name"] for m in res_today_before.json()]
         self.assertNotIn("Panadol Extra", med_names_before)
 
-        # Người nhà gọi API xác nhận đơn thuốc
-        res_verify = self.client.post("/api/family/medications/med_unverified/verify")
+        # Người nhà gọi API xác nhận đơn thuốc (scoped by elderly_id)
+        res_verify = self.client.post("/api/family/lan_1952/medications/med_unverified/verify")
         self.assertEqual(res_verify.status_code, 200)
 
         # Sau khi xác nhận -> Panadol xuất hiện an toàn cho Cụ

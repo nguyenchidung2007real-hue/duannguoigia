@@ -636,7 +636,7 @@
 
         async function toggleMedActive(medId) {
             try {
-                const res = await fetch(`${API_BASE}/family/medications/${medId}/toggle-active`, { method: 'POST' });
+                const res = await fetch(`${API_BASE}/family/${elderlyId}/medications/${medId}/toggle-active`, { method: 'POST' });
                 if (res.ok) {
                     loadDashboardData();
                 } else {

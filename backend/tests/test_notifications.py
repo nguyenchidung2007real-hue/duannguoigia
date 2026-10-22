@@ -3,12 +3,21 @@ sys.stdout.reconfigure(encoding='utf-8')
 from fastapi.testclient import TestClient
 import models
 from main import app
+from database import SessionLocal
 from services.notification_service import DISPATCHED_NOTIFICATIONS
 
 client = TestClient(app)
 
 def test_family_notification_dispatch():
     DISPATCHED_NOTIFICATIONS.clear()
+
+    # Xóa SOS logs cũ để tránh dedup block QR alert
+    db = SessionLocal()
+    db.query(models.HealthAndSOSLog).filter(
+        models.HealthAndSOSLog.elderly_id == "lan_1952"
+    ).delete()
+    db.commit()
+    db.close()
 
     # 1. Test SOS button notification dispatch
     res_sos = client.post("/api/elderly/lan_1952/sos")

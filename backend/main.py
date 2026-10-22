@@ -48,8 +48,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    # ponytail: whitelist origins, add env-var config khi deploy production
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "null"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -109,9 +110,10 @@ class ConnectionManager:
             if conn not in self.connection_rooms or not self.connection_rooms[conn]:
                 targets.add(conn)
 
-        # Nếu không có mục tiêu cụ thể, phát tới toàn bộ kết nối
+        # L2 fix: Nếu không có targets cụ thể, không fallback broadcast-all (privacy leak)
+        # chỉ gửi tới global listeners không thuộc room nào
         if not targets:
-            targets = set(self.active_connections)
+            return
 
         for connection in list(targets):
             try:
@@ -272,7 +274,10 @@ async def take_medication(
 ):
     med = (
         db.query(models.MedicationSchedule)
-        .filter(models.MedicationSchedule.id == med_id)
+        .filter(
+            models.MedicationSchedule.id == med_id,
+            models.MedicationSchedule.elderly_id == elderly_id,  # IDOR fix C3
+        )
         .first()
     )
     if not med:
@@ -330,11 +335,14 @@ async def take_medication(
     }
 
 
-@app.post("/api/elderly/medications/log/{log_id}/undo")
-async def undo_take_medication(log_id: str, db: Session = Depends(get_db)):
+@app.post("/api/elderly/{elderly_id}/medications/log/{log_id}/undo")
+async def undo_take_medication(elderly_id: str, log_id: str, db: Session = Depends(get_db)):
     log = (
         db.query(models.MedicationLog)
-        .filter(models.MedicationLog.id == log_id)
+        .filter(
+            models.MedicationLog.id == log_id,
+            models.MedicationLog.elderly_id == elderly_id,  # IDOR fix C2
+        )
         .first()
     )
     if not log:
@@ -851,6 +859,23 @@ async def trigger_emergency_qr_alert(
     now = models.get_vn_now()
     now_str = now.strftime("%H:%M - %d/%m")
 
+    # M5: Dedup PUBLIC_QR_SCAN trong 10 phút (tương tự VITAL_CRITICAL)
+    ten_mins_ago = now - timedelta(minutes=10)
+    recent_qr_sos = (
+        db.query(models.HealthAndSOSLog)
+        .filter(
+            models.HealthAndSOSLog.elderly_id == profile.id,
+            models.HealthAndSOSLog.trigger_source == "PUBLIC_QR_SCAN",
+            models.HealthAndSOSLog.triggered_at >= ten_mins_ago,
+        )
+        .first()
+    )
+    if recent_qr_sos:
+        return {
+            "success": True,
+            "message": f"Tín hiệu cứu hộ đã được gửi trước đó, gia đình Cụ {profile.full_name} đã được thông báo rồi ạ!",
+        }
+
     location_desc = "Ngoài đường (Người đi đường quét mã QR)"
     if req and req.latitude and req.longitude:
         location_desc = f"Ngoài đường (Tọa độ GPS: {req.latitude:.5f}, {req.longitude:.5f})"
@@ -1131,11 +1156,14 @@ def create_medication_schedule(
     return med
 
 
-@app.post("/api/family/medications/{med_id}/verify")
-def verify_medication_schedule(med_id: str, db: Session = Depends(get_db)):
+@app.post("/api/family/{elderly_id}/medications/{med_id}/verify")
+def verify_medication_schedule(elderly_id: str, med_id: str, db: Session = Depends(get_db)):
     med = (
         db.query(models.MedicationSchedule)
-        .filter(models.MedicationSchedule.id == med_id)
+        .filter(
+            models.MedicationSchedule.id == med_id,
+            models.MedicationSchedule.elderly_id == elderly_id,  # IDOR fix C4
+        )
         .first()
     )
     if not med:
@@ -1149,11 +1177,14 @@ def verify_medication_schedule(med_id: str, db: Session = Depends(get_db)):
     }
 
 
-@app.post("/api/family/medications/{med_id}/toggle-active")
-def toggle_medication_active(med_id: str, db: Session = Depends(get_db)):
+@app.post("/api/family/{elderly_id}/medications/{med_id}/toggle-active")
+def toggle_medication_active(elderly_id: str, med_id: str, db: Session = Depends(get_db)):
     med = (
         db.query(models.MedicationSchedule)
-        .filter(models.MedicationSchedule.id == med_id)
+        .filter(
+            models.MedicationSchedule.id == med_id,
+            models.MedicationSchedule.elderly_id == elderly_id,  # IDOR fix C4
+        )
         .first()
     )
     if not med:
@@ -1230,7 +1261,7 @@ def add_emergency_contact(
         )
 
     clean_phone = re.sub(r"\s+", "", contact_in.phone_number)
-    if not re.match(r"^0\d{9,10}$", clean_phone):
+    if not re.match(r"^0\d{9}$", clean_phone):  # M1: VN mobile = đúng 10 chữ số từ 2018
         raise HTTPException(
             status_code=422,
             detail="Số điện thoại không hợp lệ (Phải bắt đầu bằng số 0 và có 10-11 chữ số).",
@@ -1497,9 +1528,10 @@ def startup_seed_data():
 
         db.commit()
 
-    # Đảm bảo các đơn thuốc mẫu đã được xác nhận (verified_by_caregiver = True)
+    # L3 fix: Chỉ verify những đơn thuốc chưa được caregiver xem xét (không override trạng thái đã set)
     db.query(models.MedicationSchedule).filter(
-        models.MedicationSchedule.elderly_id == "lan_1952"
+        models.MedicationSchedule.elderly_id == "lan_1952",
+        models.MedicationSchedule.verified_by_caregiver == False,
     ).update({"verified_by_caregiver": True})
     db.commit()
 

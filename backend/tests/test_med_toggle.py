@@ -18,7 +18,7 @@ def test_medication_toggle_active():
     med_id = med1["id"]
 
     # 2. Toggle active (e.g. True -> False)
-    res_toggle = client.post(f"/api/family/medications/{med_id}/toggle-active")
+    res_toggle = client.post(f"/api/family/lan_1952/medications/{med_id}/toggle-active")
     assert res_toggle.status_code == 200
     data_toggle = res_toggle.json()
     assert data_toggle["success"] == True
@@ -33,7 +33,7 @@ def test_medication_toggle_active():
         print("2. Inactive medication properly excluded from elderly today view!")
 
     # 4. Toggle back to restore initial state
-    res_restore = client.post(f"/api/family/medications/{med_id}/toggle-active")
+    res_restore = client.post(f"/api/family/lan_1952/medications/{med_id}/toggle-active")
     assert res_restore.status_code == 200
     assert res_restore.json()["is_active"] == initial_active
     print("3. Restored initial medication active state!")

@@ -327,7 +327,7 @@
             if (undoBox) undoBox.classList.add('hidden');
 
             try {
-                const res = await fetch(`${API_BASE}/elderly/medications/log/${logId}/undo`, { method: "POST" });
+                const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/log/${logId}/undo`, { method: "POST" });
                 const data = await res.json();
                 await loadTodayMedications();
                 const msg = "Dạ con đã hoàn tác ghi nhận thuốc rồi ạ!";
