@@ -106,6 +106,31 @@
         </p>
     </footer>
 
+    <!-- 5. MODAL BÁO ĐỘNG UỐNG THUỐC TOÀN MÀN HÌNH DÀNH CHO CỤ (ZERO-FRICTION) -->
+    <div id="medReminderOverlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-amber-50 border-8 border-amber-400 rounded-3xl max-w-2xl w-full p-8 shadow-2xl text-center space-y-6">
+            <div class="flex items-center justify-center space-x-3 text-amber-600">
+                <i class="fa-solid fa-bell text-5xl animate-bounce"></i>
+                <span class="text-3xl font-black uppercase tracking-wider">ĐÃ ĐẾN GIỜ UỐNG THUỐC!</span>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 border-2 border-amber-200 shadow-inner space-y-2">
+                <h2 id="modalMedName" class="text-4xl md:text-5xl font-black text-slate-900">Amlodipine 5mg</h2>
+                <p id="modalMedDesc" class="text-2xl font-bold text-amber-700">1 viên (Viên tròn nhỏ màu vàng)</p>
+                <p id="modalMedTime" class="text-lg text-slate-500 font-semibold">Cữ lúc 08:00 - Nhắc lần 1</p>
+            </div>
+
+            <button id="modalBtnConfirm" onclick="confirmFromModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-3xl py-6 rounded-3xl shadow-2xl flex items-center justify-center space-x-3 border-4 border-emerald-400 transition">
+                <i class="fa-solid fa-circle-check text-4xl"></i>
+                <span>BÀ ĐÃ UỐNG RỒI (BẤM VÀO ĐÂY)</span>
+            </button>
+
+            <button onclick="dismissMedModal()" class="text-slate-500 hover:text-slate-700 text-xl font-bold underline pt-2">
+                Để lát nữa con nhắc lại
+            </button>
+        </div>
+    </div>
+
     <script>
         const API_BASE = "http://localhost:8000/api";
         let elderlyId = "lan_1952";
@@ -113,6 +138,52 @@
         let isRecording = false;
         let recognition = null;
         let pendingVitalData = null;
+        let activeModalMedId = null;
+        let activeModalMedName = null;
+
+        function playReminderChime() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.6);
+            } catch (e) {
+                console.log("Chime error:", e);
+            }
+        }
+
+        function showMedReminderModal(data) {
+            activeModalMedId = data.medication_id;
+            activeModalMedName = data.medicine_name;
+            document.getElementById('modalMedName').innerText = data.medicine_name;
+            document.getElementById('modalMedDesc').innerText = `${data.dosage || '1 viên'} (${data.pill_desc || 'Viên thuốc'})`;
+            document.getElementById('modalMedTime').innerText = `Cữ lúc ${data.time || ''} - Nhắc lần ${data.reminder_count || 1}`;
+            document.getElementById('medReminderOverlay').classList.remove('hidden');
+            playReminderChime();
+        }
+
+        function dismissMedModal() {
+            document.getElementById('medReminderOverlay').classList.add('hidden');
+            activeModalMedId = null;
+            activeModalMedName = null;
+        }
+
+        async function confirmFromModal() {
+            if (activeModalMedId) {
+                const medId = activeModalMedId;
+                const medName = activeModalMedName;
+                dismissMedModal();
+                await confirmTaken(medId, medName);
+            }
+        }
 
         function escapeHtml(str) {
             if (!str) return '';
@@ -372,6 +443,7 @@
             // ƯU TIÊN 3: CỤ BÁO ĐÃ UỐNG THUỐC
             // =========================================================================
             if (lowerText.includes("uống rồi") || lowerText.includes("đã uống") || lowerText.includes("xong rồi")) {
+                dismissMedModal();
                 try {
                     const res = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/today`);
                     const meds = await res.json();
@@ -470,9 +542,13 @@
                     const data = JSON.parse(event.data);
                     if (data.event === "MEDICATION_REMINDER") {
                         document.getElementById('aiSpeechText').innerText = data.speech_prompt;
+                        showMedReminderModal(data);
                         speak(data.speech_prompt);
                         loadTodayMedications();
-                    } else if (data.event === "MEDICATION_TAKEN" || data.event === "MEDICATION_UNDO") {
+                    } else if (data.event === "MEDICATION_TAKEN") {
+                        dismissMedModal();
+                        loadTodayMedications();
+                    } else if (data.event === "MEDICATION_UNDO") {
                         loadTodayMedications();
                     }
                 } catch (e) {
