@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 import html
+import json
 import random
 import re
 import secrets
@@ -1314,6 +1315,88 @@ def delete_emergency_contact(
     return {
         "success": True,
         "message": f"Đã xóa liên hệ {contact.full_name} khỏi danh bạ khẩn cấp.",
+    }
+
+
+# ================================================================
+# MLOPS: CONVERSATION LOG — Thu thập data fine-tuning
+# ================================================================
+
+@app.post("/api/conversation/log", response_model=schemas.ConversationLogResponse)
+def log_conversation(entry: schemas.ConversationLogCreate, db: Session = Depends(get_db)):
+    """Ghi 1 turn hội thoại. Gọi từ mọi nơi trong hệ thống (voice handler, SOS, med confirm)."""
+    row = models.ConversationLog(**entry.model_dump())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.patch("/api/conversation/log/{log_id}/feedback")
+def update_conversation_feedback(
+    log_id: str, feedback: schemas.ConversationFeedback, db: Session = Depends(get_db)
+):
+    """Caregiver đánh dấu response AI đúng/sai từ FamilyView dashboard."""
+    row = db.query(models.ConversationLog).filter(models.ConversationLog.id == log_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi hội thoại")
+    row.caregiver_feedback = feedback.caregiver_feedback
+    row.corrected_response = feedback.corrected_response
+    db.commit()
+    return {"success": True}
+
+
+@app.get("/api/admin/export-dataset")
+def export_finetune_dataset(
+    elderly_id: Optional[str] = None,
+    only_verified: bool = True,
+    db: Session = Depends(get_db),
+):
+    """
+    Export .jsonl chuẩn fine-tune cho Qwen2.5-3B (Unsloth) và PhoBERT.
+    - only_verified=True: chỉ export rows caregiver đã đánh dấu CORRECT
+    - Format LLM (Qwen): {"messages": [{"role":"system",...},{"role":"user",...},{"role":"assistant",...}]}
+    - Format classifier (PhoBERT): {"text": "...", "label": "SOS|VITAL_LOG|..."}
+
+    ponytail: thêm auth header khi deploy production, endpoint này không nên public
+    """
+    SYSTEM_PROMPT = (
+        "Bạn là AnTam AI, trợ lý chăm sóc sức khỏe người cao tuổi Việt Nam. "
+        "Xưng hô lễ phép, ấm áp như con cháu trong nhà. Câu ngắn gọn, chậm rãi. "
+        "Tuyệt đối không đưa ra chẩn đoán y khoa. Khi có dấu hiệu nguy hiểm, "
+        "hướng dẫn cụ nghỉ ngơi và báo ngay cho gia đình hoặc gọi 115."
+    )
+
+    q = db.query(models.ConversationLog)
+    if elderly_id:
+        q = q.filter(models.ConversationLog.elderly_id == elderly_id)
+    if only_verified:
+        q = q.filter(models.ConversationLog.caregiver_feedback == "CORRECT")
+    rows = q.order_by(models.ConversationLog.created_at.asc()).all()
+
+    llm_lines, clf_lines = [], []
+    for r in rows:
+        response = r.corrected_response or r.ai_response
+        if r.user_input and response:
+            llm_lines.append(json.dumps({
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": r.user_input},
+                    {"role": "assistant", "content": response},
+                ]
+            }, ensure_ascii=False))
+        if r.user_input and r.detected_intent:
+            clf_lines.append(json.dumps({
+                "text": r.user_input,
+                "label": r.detected_intent,
+            }, ensure_ascii=False))
+
+    return {
+        "total_rows": len(rows),
+        "llm_dataset_rows": len(llm_lines),
+        "clf_dataset_rows": len(clf_lines),
+        "llm_jsonl": "\n".join(llm_lines),   # Paste vào file qwen_finetune.jsonl
+        "clf_jsonl": "\n".join(clf_lines),   # Paste vào file phobert_finetune.jsonl
     }
 
 

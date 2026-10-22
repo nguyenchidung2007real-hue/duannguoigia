@@ -122,3 +122,35 @@ class HealthAndSOSLog(Base):
     resolved_at = Column(DateTime, nullable=True)
 
     elderly = relationship("ElderlyProfile", back_populates="sos_alerts")
+
+
+class ConversationLog(Base):
+    """
+    Thu thập dữ liệu hội thoại thực tế để fine-tune Qwen2.5-3B và PhoBERT.
+    Mỗi row = 1 turn hội thoại: user input → AI response → caregiver feedback.
+    Export ra .jsonl bằng GET /api/admin/export-dataset
+    """
+    __tablename__ = "conversation_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    elderly_id = Column(String(36), ForeignKey("elderly_profiles.id"), nullable=False)
+
+    # Input
+    user_input = Column(Text, nullable=False)          # Raw voice transcript / text cụ nói
+    input_source = Column(String(30), default="VOICE") # VOICE | BUTTON | SYSTEM
+
+    # Intent classification (PhoBERT target label)
+    detected_intent = Column(String(50), nullable=True) # SOS | VITAL_LOG | MED_CONFIRM | CHITCHAT | UNKNOWN
+    intent_confidence = Column(Float, nullable=True)    # 0.0–1.0
+
+    # AI Response (LLM target output)
+    ai_response = Column(Text, nullable=True)           # Câu trả lời AI đã phát ra
+    response_source = Column(String(30), default="RULE_BASED") # RULE_BASED | QWEN | PHOBERT
+
+    # Caregiver feedback loop (để lọc data quality khi export)
+    caregiver_feedback = Column(String(20), nullable=True)  # CORRECT | WRONG | IGNORED
+    corrected_response = Column(Text, nullable=True)         # Caregiver sửa lại nếu AI sai
+
+    # Metadata
+    session_id = Column(String(36), nullable=True)  # Nhóm các turns cùng 1 phiên hội thoại
+    created_at = Column(DateTime, default=get_vn_now)

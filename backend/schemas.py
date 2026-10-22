@@ -92,3 +92,30 @@ class EmergencyContactResponse(EmergencyContactCreate):
 
     class Config:
         from_attributes = True
+
+# ================================================================
+# Schema ConversationLog — MLOps data collection cho fine-tuning
+# Mỗi turn hội thoại được lưu → export .jsonl cho Qwen2.5-3B & PhoBERT
+# ================================================================
+class ConversationLogCreate(BaseModel):
+    elderly_id: str
+    user_input: str
+    input_source: str = "VOICE"          # VOICE | BUTTON | SYSTEM
+    detected_intent: Optional[str] = None # SOS | VITAL_LOG | MED_CONFIRM | CHITCHAT | UNKNOWN
+    intent_confidence: Optional[float] = None
+    ai_response: Optional[str] = None
+    response_source: str = "RULE_BASED"  # RULE_BASED | QWEN | PHOBERT
+    session_id: Optional[str] = None
+
+class ConversationFeedback(BaseModel):
+    caregiver_feedback: str              # CORRECT | WRONG | IGNORED
+    corrected_response: Optional[str] = None
+
+class ConversationLogResponse(ConversationLogCreate):
+    id: str
+    caregiver_feedback: Optional[str] = None
+    corrected_response: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
