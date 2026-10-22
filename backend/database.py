@@ -1,9 +1,11 @@
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
 
-DATABASE_URL = "sqlite:///./elderly_care.db"
+# ponytail: root db path fixed via pathlib, upgrade to env var when containerized
+DB_PATH = Path(__file__).resolve().parent.parent / "elderly_care.db"
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(
     DATABASE_URL, connect_args={"check_same_thread": False}

@@ -120,6 +120,57 @@
             </div>
         </div>
 
+        <!-- 3.5 BẢNG THEO DÕI TUÂN THỦ UỐNG THUỐC 7 NGÀY -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-900 flex items-center space-x-2">
+                        <i class="fa-solid fa-calendar-check text-blue-600"></i>
+                        <span>Lịch Sử Tuân Thủ Uống Thuốc (7 Ngày Gần Nhất)</span>
+                    </h3>
+                    <p class="text-xs text-slate-500">Thống kê tỷ lệ uống đủ cữ thuốc hàng ngày của cụ</p>
+                </div>
+                <span class="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700">7 ngày</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200 text-slate-500 text-xs">
+                            <th class="pb-3 font-semibold">NGÀY</th>
+                            <th class="pb-3 font-semibold text-center">CỮ THUỐC (ĐÃ UỐNG / TỔNG)</th>
+                            <th class="pb-3 font-semibold text-center">TỶ LỆ TUÂN THỦ</th>
+                            <th class="pb-3 font-semibold text-right">HUYẾT ÁP ĐO TRONG NGÀY</th>
+                        </tr>
+                    </thead>
+                    <tbody id="medHistoryBody" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="4" class="py-4 text-center text-slate-400">Đang tải lịch sử...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 3.6 QUẢN LÝ & THÊM ĐƠN THUỐC CHO CỤ (CAREGIVER) -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-900 flex items-center space-x-2">
+                        <i class="fa-solid fa-prescription-bottle-medical text-emerald-600"></i>
+                        <span>Danh Sách Đơn Thuốc Đang Dùng</span>
+                    </h3>
+                    <p class="text-xs text-slate-500">Cài đặt giờ và liều lượng từ xa, hệ thống sẽ tự nhắc cụ bằng loa</p>
+                </div>
+                <button onclick="toggleMedModal(true)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1 shadow-md transition-all">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Thêm đơn thuốc mới</span>
+                </button>
+            </div>
+            <div id="caregiverMedList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="col-span-full py-4 text-center text-slate-400 text-sm">Đang tải danh sách thuốc...</div>
+            </div>
+        </div>
+
         <!-- 4. NHẬT KÝ SỰ KIỆN REAL-TIME (LOGS) -->
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
             <h3 class="font-bold text-lg text-slate-900 mb-4 flex items-center space-x-2">
@@ -139,6 +190,44 @@
         </div>
 
     </main>
+
+    <!-- MODAL THÊM ĐƠN THUỐC -->
+    <div id="medModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b pb-3 border-slate-100">
+                <h3 class="text-lg font-bold text-slate-900">Thêm đơn thuốc mới cho cụ</h3>
+                <button onclick="toggleMedModal(false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <form id="addMedForm" onsubmit="submitMedication(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">TÊN THUỐC (*)</label>
+                    <input type="text" id="mName" required placeholder="VD: Amlodipine 5mg" class="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">LIỀU LƯỢNG</label>
+                        <input type="text" id="mDosage" value="1 viên" class="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">DẠNG / MÀU SẮC</label>
+                        <input type="text" id="mShape" placeholder="VD: Viên tròn vàng" class="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">HƯỚNG DẪN DÙNG</label>
+                    <input type="text" id="mInstructions" value="Uống sau ăn" class="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">GIỜ UỐNG (CÁCH NHAU DẤU PHẨY)</label>
+                    <input type="text" id="mTimes" value="08:00, 19:30" placeholder="VD: 08:00, 19:30" class="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="toggleMedModal(false)" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md">Lưu & Bật nhắc tự động</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
         const API_BASE = "http://localhost:8000/api";
@@ -343,9 +432,128 @@
                 const vitalsHistory = await vitalsRes.json();
                 renderChart(vitalsHistory);
 
+                // Tải lịch sử tuân thủ thuốc 7 ngày
+                const histRes = await fetch(`${API_BASE}/family/${elderlyId}/history?days=7`);
+                const histData = await histRes.json();
+                renderMedHistory(histData);
+
+                // Tải danh sách đơn thuốc để quản lý
+                const medsRes = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/today`);
+                const medsData = await medsRes.json();
+                renderCaregiverMedList(medsData);
+
             } catch (err) {
                 console.log("Error loading dashboard data:", err);
             }
+        }
+
+        // 3.6 Hiển thị danh sách thuốc đang dùng
+        function renderCaregiverMedList(meds) {
+            const container = document.getElementById('caregiverMedList');
+            if (!meds || meds.length === 0) {
+                container.innerHTML = '<div class="col-span-full py-4 text-center text-slate-400 text-sm">Chưa có đơn thuốc nào</div>';
+                return;
+            }
+            let html = '';
+            meds.forEach(m => {
+                const times = Array.isArray(m.schedule_times) ? m.schedule_times.join(', ') : m.schedule_times;
+                html += `
+                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between">
+                        <div class="space-y-1">
+                            <h4 class="font-bold text-slate-900">${escapeHtml(m.medicine_name)}</h4>
+                            <p class="text-xs text-slate-600">Liều lượng: <span class="font-semibold text-slate-800">${escapeHtml(m.dosage)}</span> (${escapeHtml(m.pill_color_shape || 'Dạng thường')})</p>
+                            <p class="text-xs text-slate-500">Giờ uống: <span class="font-semibold text-blue-600">${escapeHtml(times)}</span></p>
+                            <p class="text-xs text-slate-400 italic">${escapeHtml(m.instructions || '')}</p>
+                        </div>
+                        <span class="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Đã duyệt</span>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleMedModal(show) {
+            const modal = document.getElementById('medModal');
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        async function submitMedication(e) {
+            e.preventDefault();
+            const name = document.getElementById('mName').value.trim();
+            const dosage = document.getElementById('mDosage').value.trim();
+            const shape = document.getElementById('mShape').value.trim();
+            const instructions = document.getElementById('mInstructions').value.trim();
+            const rawTimes = document.getElementById('mTimes').value;
+            const times = rawTimes.split(',').map(t => t.trim()).filter(t => t.length > 0);
+
+            if (!name) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/family/medications/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        elderly_id: elderlyId,
+                        medicine_name: name,
+                        dosage: dosage || "1 viên",
+                        pill_color_shape: shape || "Viên tròn",
+                        instructions: instructions || "Uống sau ăn",
+                        schedule_times: times.length > 0 ? times : ["08:00"]
+                    })
+                });
+                if (res.ok) {
+                    toggleMedModal(false);
+                    document.getElementById('addMedForm').reset();
+                    loadDashboardData();
+                } else {
+                    alert('Lỗi thêm đơn thuốc');
+                }
+            } catch(err) {
+                console.log('Error creating med:', err);
+            }
+        }
+
+        // 3.5 Render bảng lịch sử uống thuốc 7 ngày
+        function renderMedHistory(history) {
+            const tbody = document.getElementById('medHistoryBody');
+            if (!history || history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-400">Chưa có dữ liệu</td></tr>';
+                return;
+            }
+
+            let html = '';
+            history.forEach(day => {
+                let badgeClass = 'bg-rose-100 text-rose-800 border-rose-200';
+                let statusLabel = 'Chưa đạt';
+                if (day.compliance_rate >= 100) {
+                    badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                    statusLabel = 'Đạt 100%';
+                } else if (day.compliance_rate >= 50) {
+                    badgeClass = 'bg-amber-100 text-amber-800 border-amber-200';
+                    statusLabel = 'Cần nhắc';
+                }
+
+                const bpStr = (day.systolic && day.diastolic) 
+                    ? `<span class="font-bold text-slate-700">${day.systolic}/${day.diastolic}</span> <span class="text-xs text-slate-400">mmHg</span>`
+                    : '<span class="text-xs text-slate-400 italic">Không đo</span>';
+
+                html += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-3 font-medium text-slate-800">${escapeHtml(day.date)}</td>
+                        <td class="py-3 text-center">
+                            <span class="font-bold text-slate-900">${day.taken_doses}</span> / <span class="text-slate-500">${day.total_doses}</span> cữ
+                        </td>
+                        <td class="py-3 text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${badgeClass}">
+                                ${day.compliance_rate}% (${statusLabel})
+                            </span>
+                        </td>
+                        <td class="py-3 text-right">${bpStr}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
         }
 
         // 4. Vẽ biểu đồ Chart.js

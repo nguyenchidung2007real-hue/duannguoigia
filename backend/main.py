@@ -21,6 +21,7 @@ try:
         normalize_bp_value,
         preprocess_voice_text,
     )
+    from services.notification_service import dispatch_family_alert, DISPATCHED_NOTIFICATIONS
 except ModuleNotFoundError:
     try:
         from backend.services.medical_guardrails import (
@@ -28,12 +29,14 @@ except ModuleNotFoundError:
             normalize_bp_value,
             preprocess_voice_text,
         )
+        from backend.services.notification_service import dispatch_family_alert, DISPATCHED_NOTIFICATIONS
     except ModuleNotFoundError:
         from medical_guardrails import (
             evaluate_blood_pressure,
             normalize_bp_value,
             preprocess_voice_text,
         )
+        from notification_service import dispatch_family_alert, DISPATCHED_NOTIFICATIONS
 
 Base.metadata.create_all(bind=engine)
 
@@ -656,6 +659,15 @@ async def trigger_elderly_sos(elderly_id: str, db: Session = Depends(get_db)):
         elderly_id=elderly_id,
     )
 
+    dispatch_family_alert(
+        elderly_id=elderly_id,
+        title=f"🚨 CẤP CỨU SOS: Cụ {profile.full_name}",
+        message=f"Cụ {profile.full_name} vừa bấm nút CẤP CỨU SOS tại nhà. Xin vui lòng liên lạc hoặc kiểm tra ngay!",
+        alert_type="SOS_EMERGENCY",
+        db=db,
+        location="Tại nhà",
+    )
+
     return {
         "success": True,
         "message": "Dạ con đã phát chuông báo động khẩn cấp tới con cháu ngay lập tức rồi ạ! Cụ hãy ngồi nghỉ ngay tại chỗ nhé ạ!",
@@ -865,6 +877,15 @@ async def trigger_emergency_qr_alert(
         elderly_id=profile.id,
     )
 
+    dispatch_family_alert(
+        elderly_id=profile.id,
+        title=f"🚨 CỨU HỘ NGOÀI ĐƯỜNG: Cụ {profile.full_name}",
+        message=f"Người đi đường vừa gửi tín hiệu yêu cầu hỗ trợ Cụ {profile.full_name}. Vị trí: {location_desc}",
+        alert_type="PUBLIC_QR_SCAN",
+        db=db,
+        location=location_desc,
+    )
+
     return {
         "success": True,
         "message": f"Đã gửi thông báo cứu hộ khẩn cấp tới gia đình Cụ {profile.full_name} thành công!",
@@ -1048,6 +1069,14 @@ async def check_medication_schedules():
                     elderly_id=med.elderly_id,
                 )
 
+                dispatch_family_alert(
+                    elderly_id=med.elderly_id,
+                    title=f"⚠️ CẢNH BÁO: Bỏ lỡ cữ thuốc {med.medicine_name}",
+                    message=f"Cụ chưa uống thuốc {med.medicine_name} ({log.scheduled_time.strftime('%H:%M')}) sau 3 lần phát loa nhắc nhở!",
+                    alert_type="MEDICATION_MISSED",
+                    db=db,
+                )
+
     except Exception as e:
         print(f"Error in scheduler: {e}")
     finally:
@@ -1134,15 +1163,17 @@ def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
     now = models.get_vn_now()
     today_start = datetime.combine(now.date(), datetime.min.time())
 
-    total_meds = (
+    active_meds = (
         db.query(models.MedicationSchedule)
         .filter(
             models.MedicationSchedule.elderly_id == elderly_id,
             models.MedicationSchedule.is_active == True,
             models.MedicationSchedule.verified_by_caregiver == True,
         )
-        .count()
+        .all()
     )
+    # ponytail: đếm tổng cữ theo schedule_times array, upgrade to recurrence rule khi có thuốc cách nhật
+    total_doses = sum(len(m.schedule_times) if isinstance(m.schedule_times, list) else 1 for m in active_meds)
 
     taken_count = (
         db.query(models.MedicationLog)
@@ -1162,7 +1193,7 @@ def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
     )
 
     compliance = (
-        round((taken_count / total_meds * 100), 1) if total_meds > 0 else 100.0
+        round((taken_count / total_doses * 100), 1) if total_doses > 0 else 100.0
     )
 
     return {
@@ -1174,7 +1205,7 @@ def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
             "pairing_code": profile.pairing_code,
         },
         "medication_stats": {
-            "total_today": total_meds,
+            "total_today": total_doses,
             "taken_today": taken_count,
             "compliance_rate": compliance,
         },
@@ -1190,6 +1221,71 @@ def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
             ),
         },
     }
+
+
+@app.get("/api/family/{elderly_id}/history")
+def get_family_history(elderly_id: str, days: int = 7, db: Session = Depends(get_db)):
+    # ponytail: giới hạn 30 ngày tránh query quét bảng lớn, upgrade to partition khi DB > 100k rows
+    days = min(max(days, 1), 30)
+    now = models.get_vn_now()
+
+    active_meds = (
+        db.query(models.MedicationSchedule)
+        .filter(
+            models.MedicationSchedule.elderly_id == elderly_id,
+            models.MedicationSchedule.is_active == True,
+            models.MedicationSchedule.verified_by_caregiver == True,
+        )
+        .all()
+    )
+    daily_expected_doses = sum(len(m.schedule_times) if isinstance(m.schedule_times, list) else 1 for m in active_meds)
+
+    history = []
+    for i in range(days - 1, -1, -1):
+        target_date = (now - timedelta(days=i)).date()
+        day_start = datetime.combine(target_date, datetime.min.time())
+        day_end = datetime.combine(target_date, datetime.max.time())
+
+        taken_count = (
+            db.query(models.MedicationLog)
+            .filter(
+                models.MedicationLog.elderly_id == elderly_id,
+                models.MedicationLog.scheduled_time >= day_start,
+                models.MedicationLog.scheduled_time <= day_end,
+                models.MedicationLog.status == "TAKEN",
+            )
+            .count()
+        )
+
+        vital = (
+            db.query(models.VitalSign)
+            .filter(
+                models.VitalSign.elderly_id == elderly_id,
+                models.VitalSign.measured_at >= day_start,
+                models.VitalSign.measured_at <= day_end,
+            )
+            .order_by(models.VitalSign.measured_at.desc())
+            .first()
+        )
+
+        comp = round((taken_count / daily_expected_doses * 100), 1) if daily_expected_doses > 0 else 100.0
+        history.append({
+            "date": target_date.strftime("%d/%m"),
+            "full_date": target_date.isoformat(),
+            "total_doses": daily_expected_doses,
+            "taken_doses": taken_count,
+            "compliance_rate": comp,
+            "systolic": vital.systolic if vital else None,
+            "diastolic": vital.diastolic if vital else None,
+            "heart_rate": vital.heart_rate if vital else None,
+        })
+    return history
+
+
+@app.get("/api/family/{elderly_id}/notifications")
+def get_family_notifications(elderly_id: str):
+    # ponytail: trả về danh sách cảnh báo đã dispatch trong bộ nhớ, upgrade to persistent table khi kết nối dịch vụ ngoài
+    return [n for n in reversed(DISPATCHED_NOTIFICATIONS) if n.get("elderly_id") == elderly_id]
 
 
 # ========================================================
