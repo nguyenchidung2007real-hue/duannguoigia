@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON, Index
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -154,3 +154,7 @@ class ConversationLog(Base):
     # Metadata
     session_id = Column(String(36), nullable=True)  # Nhóm các turns cùng 1 phiên hội thoại
     created_at = Column(DateTime, default=get_vn_now)
+
+# fix [8]: index cho export-dataset và feedback queries
+Index("ix_convlog_elderly_created", ConversationLog.elderly_id, ConversationLog.created_at)
+Index("ix_convlog_feedback", ConversationLog.caregiver_feedback)

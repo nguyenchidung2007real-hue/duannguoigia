@@ -1,7 +1,10 @@
 import os
 import re
 import json
+import logging
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 # ponytail: heuristic regex parser for Vietnamese prescriptions; upgrade to Gemini 2.5 Flash Vision khi cấu hình GEMINI_API_KEY
 def parse_vietnamese_prescription_text(text: str) -> List[Dict]:
@@ -144,8 +147,9 @@ def extract_prescription(
                 "warning": "⚠️ LƯU Ý Y TẾ: Kết quả quét đơn thuốc bằng AI chỉ mang tính chất tham khảo. Người nhà bắt buộc kiểm tra lại trước khi kích hoạt lịch uống.",
                 "verified_by_caregiver": False
             }
-        except Exception:
-            pass
+        except Exception as e:
+            # fix [5/6]: log type only — không log str(e) để tránh leak API key trong error message
+            logger.warning("Gemini OCR failed (%s), falling back to heuristic parser", type(e).__name__)
 
     # 2. Heuristic fallback parser
     text_to_parse = raw_text or ""

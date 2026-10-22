@@ -1,6 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 from datetime import datetime
+import re as _re
+
+_TIME_PAT = _re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 # Schema cho Hồ sơ Người cao tuổi
 class ElderlyProfileCreate(BaseModel):
@@ -34,6 +37,14 @@ class MedicationCreate(BaseModel):
     instructions: str = "Uống sau ăn"
     schedule_times: List[str] = ["08:00"]
 
+    @field_validator("schedule_times")  # fix [3]: validate HH:MM format
+    @classmethod
+    def check_times(cls, v):
+        for t in v:
+            if not _TIME_PAT.match(t):
+                raise ValueError(f"Giờ uống không hợp lệ: {t!r} (cần định dạng HH:MM, ví dụ: 08:00)")
+        return v
+
 class MedicationResponse(MedicationCreate):
     id: str
     is_active: bool
@@ -44,7 +55,7 @@ class MedicationResponse(MedicationCreate):
 
 # Schema xác nhận hàng loạt thuốc từ OCR đơn thuốc
 class PrescriptionBatchCreate(BaseModel):
-    medications: List[MedicationCreate]
+    medications: List[MedicationCreate] = Field(..., min_length=1, max_length=20)  # fix [2]: max 20 meds/batch
     raw_ocr_text: Optional[str] = None
 
 # Schema Xác nhận đã uống thuốc
@@ -104,7 +115,7 @@ class EmergencyContactResponse(EmergencyContactCreate):
 # ================================================================
 class ConversationLogCreate(BaseModel):
     elderly_id: str
-    user_input: str
+    user_input: str = Field(..., min_length=1, max_length=2000)  # fix [7]: prevent rogue data in training set
     input_source: str = "VOICE"          # VOICE | BUTTON | SYSTEM
     detected_intent: Optional[str] = None # SOS | VITAL_LOG | MED_CONFIRM | CHITCHAT | UNKNOWN
     intent_confidence: Optional[float] = None

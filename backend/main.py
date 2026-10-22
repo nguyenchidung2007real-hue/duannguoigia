@@ -1250,7 +1250,16 @@ async def ocr_prescription(
     image_bytes = None
     filename = None
     if file:
-        image_bytes = await file.read()
+        # fix [1]: giới hạn 10 MB để tránh DoS OOM
+        _MAX_OCR_BYTES = 10 * 1024 * 1024
+        chunk = await file.read(_MAX_OCR_BYTES + 1)
+        if len(chunk) > _MAX_OCR_BYTES:
+            raise HTTPException(status_code=413, detail="File quá lớn. Tối đa 10 MB.")
+        # fix [4]: chỉ chấp nhận ảnh JPEG / PNG / WebP
+        _ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}
+        if file.content_type and file.content_type not in _ALLOWED_MIME:
+            raise HTTPException(status_code=415, detail="Chỉ chấp nhận ảnh JPEG, PNG hoặc WebP.")
+        image_bytes = chunk
         filename = file.filename
 
     result = extract_prescription(image_bytes=image_bytes, raw_text=raw_text, filename=filename)
