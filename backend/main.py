@@ -1149,6 +1149,50 @@ def verify_medication_schedule(med_id: str, db: Session = Depends(get_db)):
     }
 
 
+@app.post("/api/family/medications/{med_id}/toggle-active")
+def toggle_medication_active(med_id: str, db: Session = Depends(get_db)):
+    med = (
+        db.query(models.MedicationSchedule)
+        .filter(models.MedicationSchedule.id == med_id)
+        .first()
+    )
+    if not med:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn thuốc")
+
+    med.is_active = not med.is_active
+    db.commit()
+    status_label = "kích hoạt dùng" if med.is_active else "tạm dừng"
+    return {
+        "success": True,
+        "is_active": med.is_active,
+        "message": f"Đã chuyển đơn thuốc {med.medicine_name} sang trạng thái {status_label}.",
+    }
+
+
+@app.get("/api/family/{elderly_id}/medications")
+def get_family_medications(elderly_id: str, db: Session = Depends(get_db)):
+    # ponytail: lấy toàn bộ danh sách đơn thuốc (gồm cả đang dùng & tạm dừng) cho người nhà quản lý
+    meds = (
+        db.query(models.MedicationSchedule)
+        .filter(models.MedicationSchedule.elderly_id == elderly_id)
+        .order_by(models.MedicationSchedule.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": m.id,
+            "medicine_name": m.medicine_name,
+            "pill_color_shape": m.pill_color_shape,
+            "dosage": m.dosage,
+            "instructions": m.instructions,
+            "schedule_times": m.schedule_times,
+            "verified_by_caregiver": m.verified_by_caregiver,
+            "is_active": m.is_active,
+        }
+        for m in meds
+    ]
+
+
 @app.get("/api/family/summary/{elderly_id}")
 def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
     profile = (

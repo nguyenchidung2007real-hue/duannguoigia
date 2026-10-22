@@ -479,8 +479,8 @@
                 const histData = await histRes.json();
                 renderMedHistory(histData);
 
-                // Tải danh sách đơn thuốc để quản lý
-                const medsRes = await fetch(`${API_BASE}/elderly/${elderlyId}/medications/today`);
+                // Tải danh sách đơn thuốc để quản lý (cả đang dùng & tạm dừng)
+                const medsRes = await fetch(`${API_BASE}/family/${elderlyId}/medications`);
                 const medsData = await medsRes.json();
                 renderCaregiverMedList(medsData);
 
@@ -544,19 +544,46 @@
             let html = '';
             meds.forEach(m => {
                 const times = Array.isArray(m.schedule_times) ? m.schedule_times.join(', ') : m.schedule_times;
+                const isActive = m.is_active;
+                const cardBorder = isActive ? 'border-slate-200 bg-slate-50' : 'border-slate-200 bg-slate-100/70 opacity-60';
+                const statusBadge = isActive 
+                    ? '<span class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Đang dùng</span>'
+                    : '<span class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700 border border-slate-300">Tạm dừng</span>';
+                const toggleBtn = isActive
+                    ? `<button onclick="toggleMedActive('${m.id}')" class="text-xs px-3 py-1 rounded-lg font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition">Tạm dừng</button>`
+                    : `<button onclick="toggleMedActive('${m.id}')" class="text-xs px-3 py-1 rounded-lg font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition">Tiếp tục dùng</button>`;
+
                 html += `
-                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between">
+                    <div class="p-4 rounded-xl border ${cardBorder} flex items-start justify-between">
                         <div class="space-y-1">
-                            <h4 class="font-bold text-slate-900">${escapeHtml(m.medicine_name)}</h4>
+                            <div class="flex items-center space-x-2">
+                                <h4 class="font-bold text-slate-900">${escapeHtml(m.medicine_name)}</h4>
+                                ${statusBadge}
+                            </div>
                             <p class="text-xs text-slate-600">Liều lượng: <span class="font-semibold text-slate-800">${escapeHtml(m.dosage)}</span> (${escapeHtml(m.pill_color_shape || 'Dạng thường')})</p>
                             <p class="text-xs text-slate-500">Giờ uống: <span class="font-semibold text-blue-600">${escapeHtml(times)}</span></p>
                             <p class="text-xs text-slate-400 italic">${escapeHtml(m.instructions || '')}</p>
                         </div>
-                        <span class="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Đã duyệt</span>
+                        <div class="flex flex-col items-end space-y-2">
+                            ${toggleBtn}
+                        </div>
                     </div>
                 `;
             });
             container.innerHTML = html;
+        }
+
+        async function toggleMedActive(medId) {
+            try {
+                const res = await fetch(`${API_BASE}/family/medications/${medId}/toggle-active`, { method: 'POST' });
+                if (res.ok) {
+                    loadDashboardData();
+                } else {
+                    alert('Lỗi cập nhật trạng thái đơn thuốc');
+                }
+            } catch(e) {
+                console.log('Error toggling med:', e);
+            }
         }
 
         function toggleMedModal(show) {
