@@ -66,6 +66,7 @@ class VitalSignResponse(BaseModel):
     diastolic: float
     heart_rate: Optional[float]
     health_category: str
+    raw_voice_transcript: Optional[str] = None
     measured_at: datetime
 
     class Config:

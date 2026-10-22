@@ -610,6 +610,7 @@ def get_vitals_history(elderly_id: str, db: Session = Depends(get_db)):
             "diastolic": r.diastolic,
             "heart_rate": r.heart_rate,
             "category": r.health_category,
+            "raw_voice_transcript": r.raw_voice_transcript,
             "measured_at": r.measured_at.strftime("%d/%m %H:%M"),
         }
         for r in records

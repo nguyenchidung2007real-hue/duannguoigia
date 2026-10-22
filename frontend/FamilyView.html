@@ -118,6 +118,30 @@
             <div class="h-64">
                 <canvas id="bpChart"></canvas>
             </div>
+
+            <!-- BẢNG CHI TIẾT CÁC LẦN ĐO GẦN ĐÂY -->
+            <div class="mt-6 border-t border-slate-100 pt-4">
+                <h4 class="font-bold text-sm text-slate-800 mb-3 flex items-center space-x-2">
+                    <i class="fa-solid fa-list-check text-rose-500"></i>
+                    <span>Chi Tiết Các Lần Cụ Đọc Huyết Áp Gần Đây</span>
+                </h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-slate-500 pb-2">
+                                <th class="pb-2 font-semibold">THỜI GIAN</th>
+                                <th class="pb-2 font-semibold text-center">HUYẾT ÁP (mmHg)</th>
+                                <th class="pb-2 font-semibold text-center">NHỊP TIM</th>
+                                <th class="pb-2 font-semibold text-center">PHÂN LOẠI Y TẾ</th>
+                                <th class="pb-2 font-semibold text-right">GIỌNG NÓI GỐC CỦA CỤ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vitalsTableBody" class="divide-y divide-slate-100 text-slate-700">
+                            <tr><td colspan="5" class="py-3 text-center text-slate-400">Đang tải lịch sử đo...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- 3.5 BẢNG THEO DÕI TUÂN THỦ UỐNG THUỐC 7 NGÀY -->
@@ -448,6 +472,7 @@
                 const vitalsRes = await fetch(`${API_BASE}/elderly/${elderlyId}/vitals/history`);
                 const vitalsHistory = await vitalsRes.json();
                 renderChart(vitalsHistory);
+                renderVitalsTable(vitalsHistory);
 
                 // Tải lịch sử tuân thủ thuốc 7 ngày
                 const histRes = await fetch(`${API_BASE}/family/${elderlyId}/history?days=7`);
@@ -667,6 +692,47 @@
                     }
                 }
             });
+        }
+
+        // 4.5 Hiển thị bảng chi tiết các lần cụ đọc huyết áp
+        function renderVitalsTable(records) {
+            const tbody = document.getElementById('vitalsTableBody');
+            if (!records || records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-3 text-center text-slate-400">Chưa có lịch sử đo huyết áp</td></tr>';
+                return;
+            }
+            let html = '';
+            records.forEach(r => {
+                let badge = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                let label = 'Bình thường';
+                const cat = r.category || r.health_category || '';
+                if (cat.includes('CRITICAL')) {
+                    badge = 'bg-rose-100 text-rose-800 border-rose-300 font-black animate-pulse';
+                    label = 'NGUY HIỂM';
+                } else if (cat.includes('STAGE') || cat.includes('LOW') || cat.includes('MIXED')) {
+                    badge = 'bg-amber-100 text-amber-800 border-amber-200 font-bold';
+                    label = 'Cần chú ý';
+                }
+
+                const hrStr = r.heart_rate ? `<span class="font-bold text-slate-800">${r.heart_rate}</span> bpm` : '<span class="text-slate-400">-</span>';
+                const transcript = r.raw_voice_transcript ? `"${escapeHtml(r.raw_voice_transcript)}"` : '<span class="text-slate-400 italic">Đo tự động</span>';
+                const timeStr = escapeHtml(r.measured_at || '');
+
+                html += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-2.5 font-medium text-slate-600">${timeStr}</td>
+                        <td class="py-2.5 text-center font-black text-slate-900">${r.systolic}/${r.diastolic}</td>
+                        <td class="py-2.5 text-center text-slate-700">${hrStr}</td>
+                        <td class="py-2.5 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${badge}">
+                                ${label}
+                            </span>
+                        </td>
+                        <td class="py-2.5 text-right text-slate-500 font-serif italic">${transcript}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
         }
 
         window.onload = () => {
