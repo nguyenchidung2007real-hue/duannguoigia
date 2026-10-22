@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git/
+venv/
+env/
+.venv/
+elderly_care.db
+*.sqlite
+*.sqlite3
+*.zip
+node_modules/
