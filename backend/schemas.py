@@ -42,6 +42,11 @@ class MedicationResponse(MedicationCreate):
     class Config:
         from_attributes = True
 
+# Schema xác nhận hàng loạt thuốc từ OCR đơn thuốc
+class PrescriptionBatchCreate(BaseModel):
+    medications: List[MedicationCreate]
+    raw_ocr_text: Optional[str] = None
+
 # Schema Xác nhận đã uống thuốc
 class MedicationTakeRequest(BaseModel):
     confirmation_method: str = "BUTTON_CLICK"

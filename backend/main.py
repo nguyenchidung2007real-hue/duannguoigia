@@ -7,7 +7,7 @@ import re
 import secrets
 from typing import Dict, List, Optional, Set
 
-from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
@@ -23,6 +23,7 @@ try:
         preprocess_voice_text,
     )
     from services.notification_service import dispatch_family_alert, DISPATCHED_NOTIFICATIONS
+    from services.ocr_service import extract_prescription
 except ModuleNotFoundError:
     try:
         from backend.services.medical_guardrails import (
@@ -31,6 +32,7 @@ except ModuleNotFoundError:
             preprocess_voice_text,
         )
         from backend.services.notification_service import dispatch_family_alert, DISPATCHED_NOTIFICATIONS
+        from backend.services.ocr_service import extract_prescription
     except ModuleNotFoundError:
         from medical_guardrails import (
             evaluate_blood_pressure,
@@ -38,6 +40,7 @@ except ModuleNotFoundError:
             preprocess_voice_text,
         )
         from notification_service import dispatch_family_alert, DISPATCHED_NOTIFICATIONS
+        from ocr_service import extract_prescription
 
 Base.metadata.create_all(bind=engine)
 
@@ -1223,6 +1226,92 @@ def get_family_medications(elderly_id: str, db: Session = Depends(get_db)):
         }
         for m in meds
     ]
+
+
+@app.post("/api/family/{elderly_id}/prescriptions/ocr")
+async def ocr_prescription(
+    elderly_id: str,
+    file: Optional[UploadFile] = File(None),
+    raw_text: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Bóc tách đơn thuốc bằng AI (Gemini Vision hoặc Heuristic NLP).
+    - AN TOÀN Y KHOA: Chỉ trả về danh sách đề xuất để người nhà kiểm tra, chưa lưu trực tiếp vào DB.
+    """
+    profile = (
+        db.query(models.ElderlyProfile)
+        .filter(models.ElderlyProfile.id == elderly_id)
+        .first()
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hồ sơ người cao tuổi")
+
+    image_bytes = None
+    filename = None
+    if file:
+        image_bytes = await file.read()
+        filename = file.filename
+
+    result = extract_prescription(image_bytes=image_bytes, raw_text=raw_text, filename=filename)
+    return result
+
+
+@app.post("/api/family/{elderly_id}/prescriptions/batch-create")
+def batch_create_prescriptions(
+    elderly_id: str,
+    batch_in: schemas.PrescriptionBatchCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Xác nhận lưu danh sách thuốc từ kết quả OCR vào lịch uống của Cụ.
+    - AN TOÀN Y KHOA: verified_by_caregiver = True vì người nhà đã trực tiếp rà soát và bấm xác nhận.
+    - BẢO MẬT: Scoped theo elderly_id chống tấn công IDOR.
+    """
+    profile = (
+        db.query(models.ElderlyProfile)
+        .filter(models.ElderlyProfile.id == elderly_id)
+        .first()
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hồ sơ người cao tuổi")
+
+    created = []
+    for med_in in batch_in.medications:
+        new_med = models.MedicationSchedule(
+            elderly_id=elderly_id,
+            medicine_name=med_in.medicine_name.strip(),
+            pill_color_shape=med_in.pill_color_shape or "Viên thuốc tròn",
+            dosage=med_in.dosage or "1 viên",
+            instructions=med_in.instructions or "Uống sau ăn",
+            schedule_times=med_in.schedule_times or ["08:00"],
+            raw_ocr_text=batch_in.raw_ocr_text,
+            verified_by_caregiver=True,
+            is_active=True,
+        )
+        db.add(new_med)
+        created.append(new_med)
+
+    db.commit()
+    for m in created:
+        db.refresh(m)
+
+    return {
+        "success": True,
+        "count": len(created),
+        "message": f"Đã lưu thành công {len(created)} loại thuốc vào lịch uống của Cụ.",
+        "medications": [
+            {
+                "id": m.id,
+                "medicine_name": m.medicine_name,
+                "dosage": m.dosage,
+                "schedule_times": m.schedule_times,
+                "instructions": m.instructions,
+                "verified_by_caregiver": m.verified_by_caregiver,
+            }
+            for m in created
+        ],
+    }
 
 
 @app.get(

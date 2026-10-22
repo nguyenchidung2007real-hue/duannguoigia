@@ -185,10 +185,16 @@
                     </h3>
                     <p class="text-xs text-slate-500">Cài đặt giờ và liều lượng từ xa, hệ thống sẽ tự nhắc cụ bằng loa</p>
                 </div>
-                <button onclick="toggleMedModal(true)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1 shadow-md transition-all">
-                    <i class="fa-solid fa-plus"></i>
-                    <span>Thêm đơn thuốc mới</span>
-                </button>
+                <div class="flex items-center space-x-2">
+                    <button onclick="toggleOcrModal(true)" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md transition-all">
+                        <i class="fa-solid fa-camera"></i>
+                        <span>Quét đơn thuốc (OCR AI)</span>
+                    </button>
+                    <button onclick="toggleMedModal(true)" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1 shadow-md transition-all">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Thêm thủ công</span>
+                    </button>
+                </div>
             </div>
             <div id="caregiverMedList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="col-span-full py-4 text-center text-slate-400 text-sm">Đang tải danh sách thuốc...</div>
@@ -323,6 +329,91 @@
                     <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md">Lưu liên hệ</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL QUÉT ĐƠN THUỐC BẰNG OCR AI -->
+    <div id="ocrModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b pb-3 border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <i class="fa-solid fa-camera"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">Quét Đơn Thuốc Bằng AI (OCR)</h3>
+                </div>
+                <button onclick="toggleOcrModal(false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <div class="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 font-medium flex items-start space-x-2">
+                <i class="fa-solid fa-shield-halved text-amber-600 mt-0.5 text-sm"></i>
+                <span><strong>NGUYÊN TẮC AN TOÀN Y KHOA:</strong> Kết quả AI chỉ bóc tách đề xuất. Người nhà hãy kiểm tra lại kỹ tên thuốc và liều lượng trong bảng bên dưới trước khi bấm "Xác nhận đưa vào lịch".</span>
+            </div>
+
+            <!-- CHỌN ẢNH HOẶC DÁN TEXT -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-bold text-slate-700">1. CHỌN ẢNH ĐƠN THUỐC HOẶC DÁN NỘI DUNG</label>
+                    <button type="button" onclick="fillSamplePrescription()" class="text-xs text-blue-600 hover:underline font-semibold flex items-center space-x-1">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>Dán đơn mẫu thử nghiệm</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <input type="file" id="ocrFileInput" accept="image/*" class="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border rounded-xl p-1.5">
+                    </div>
+                    <div>
+                        <button type="button" onclick="runOcr()" id="btnRunOcr" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center space-x-1.5 transition-all">
+                            <i class="fa-solid fa-bolt"></i>
+                            <span id="btnRunOcrText">Bắt đầu bóc tách thuốc</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <textarea id="ocrTextInput" rows="3" placeholder="Hoặc dán nội dung đơn thuốc dạng văn bản vào đây... Ví dụ:&#10;1. Amlodipine 5mg: 1 viên uống sáng sau ăn (08:00)&#10;2. Metformin 850mg: 1 viên x 2 lần/ngày (sáng 08:00, tối 19:30)" class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none font-mono"></textarea>
+                </div>
+            </div>
+
+            <!-- BẢNG KẾT QUẢ REVIEW CÓ THỂ CHỈNH SỬA -->
+            <div id="ocrResultSection" class="space-y-3 hidden border-t pt-3 border-slate-100">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-bold text-emerald-800 flex items-center space-x-1">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>2. KẾT QUẢ BÓC TÁCH (HÃY KIỂM TRA LẠI & CHỈNH SỬA NẾU CẦN)</span>
+                    </label>
+                    <button type="button" onclick="addOcrRow()" class="text-xs text-emerald-600 font-bold hover:underline">
+                        + Thêm thuốc
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                            <tr>
+                                <th class="p-2.5">Tên thuốc</th>
+                                <th class="p-2.5 w-24">Liều lượng</th>
+                                <th class="p-2.5 w-32">Giờ uống</th>
+                                <th class="p-2.5">Hướng dẫn</th>
+                                <th class="p-2.5 w-10 text-center">Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ocrRowsBody" class="divide-y divide-slate-100">
+                            <!-- Rows rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="toggleOcrModal(false)" class="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
+                    <button type="button" onclick="saveOcrMedications()" id="btnSaveOcr" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5">
+                        <i class="fa-solid fa-check"></i>
+                        <span>Xác nhận & Lưu vào lịch uống của Cụ</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -778,6 +869,190 @@
                 }
             } catch(e) {
                 console.log('Error deleting contact:', e);
+            }
+        }
+
+        // ==========================================
+        // 3.6 QUÉT ĐƠN THUỐC BẰNG OCR AI
+        // ==========================================
+        let currentOcrMedicines = [];
+
+        function toggleOcrModal(show) {
+            const modal = document.getElementById('ocrModal');
+            if (show) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function fillSamplePrescription() {
+            const sampleText = `ĐƠN THUỐC ĐIỀU TRỊ NGOẠI TRÚ
+Bệnh nhân: Nguyễn Thị Lan - 74 tuổi
+Chẩn đoán: Tăng huyết áp, Đái tháo đường Type 2
+
+1. Amlodipine 5mg: 1 viên, uống sáng sau ăn (08:00)
+2. Metformin 850mg: 1 viên x 2 lần/ngày (sáng 08:00, tối 19:30)
+3. Atorvastatin 20mg: 1 viên, uống tối trước khi đi ngủ (20:00)`;
+            document.getElementById('ocrTextInput').value = sampleText;
+        }
+
+        async function runOcr() {
+            const fileInput = document.getElementById('ocrFileInput');
+            const textInput = document.getElementById('ocrTextInput');
+            const btn = document.getElementById('btnRunOcr');
+            const btnText = document.getElementById('btnRunOcrText');
+
+            const hasFile = fileInput.files && fileInput.files.length > 0;
+            const textVal = textInput.value.trim();
+
+            if (!hasFile && !textVal) {
+                alert('Vui lòng chọn ảnh đơn thuốc hoặc dán nội dung đơn thuốc.');
+                return;
+            }
+
+            btn.disabled = true;
+            btnText.textContent = 'Đang phân tích AI...';
+
+            try {
+                const formData = new FormData();
+                if (hasFile) formData.append('file', fileInput.files[0]);
+                if (textVal) formData.append('raw_text', textVal);
+
+                const res = await fetch(`${API_BASE}/family/${elderlyId}/prescriptions/ocr`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.success && data.extracted_medicines && data.extracted_medicines.length > 0) {
+                    currentOcrMedicines = data.extracted_medicines;
+                    renderOcrRows();
+                    document.getElementById('ocrResultSection').classList.remove('hidden');
+                } else {
+                    alert('Không tìm thấy thông tin thuốc hợp lệ từ đơn này. Vui lòng kiểm tra lại ảnh hoặc văn bản.');
+                }
+            } catch (err) {
+                console.error('OCR Error:', err);
+                alert('Lỗi khi bóc tách đơn thuốc.');
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Bắt đầu bóc tách thuốc';
+            }
+        }
+
+        function renderOcrRows() {
+            const tbody = document.getElementById('ocrRowsBody');
+            let html = '';
+            currentOcrMedicines.forEach((m, idx) => {
+                const timesStr = Array.isArray(m.schedule_times) ? m.schedule_times.join(', ') : (m.schedule_times || '08:00');
+                html += `
+                    <tr>
+                        <td class="p-2">
+                            <input type="text" id="ocr_name_${idx}" value="${escapeHtml(m.medicine_name)}" class="w-full px-2 py-1.5 border rounded-lg text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none">
+                        </td>
+                        <td class="p-2">
+                            <input type="text" id="ocr_dose_${idx}" value="${escapeHtml(m.dosage || '1 viên')}" class="w-full px-2 py-1.5 border rounded-lg text-xs text-slate-700 focus:ring-1 focus:ring-blue-500 outline-none">
+                        </td>
+                        <td class="p-2">
+                            <input type="text" id="ocr_times_${idx}" value="${escapeHtml(timesStr)}" placeholder="08:00, 19:30" class="w-full px-2 py-1.5 border rounded-lg text-xs text-slate-700 focus:ring-1 focus:ring-blue-500 outline-none font-mono">
+                        </td>
+                        <td class="p-2">
+                            <input type="text" id="ocr_inst_${idx}" value="${escapeHtml(m.instructions || 'Uống sau ăn')}" class="w-full px-2 py-1.5 border rounded-lg text-xs text-slate-700 focus:ring-1 focus:ring-blue-500 outline-none">
+                        </td>
+                        <td class="p-2 text-center">
+                            <button type="button" onclick="removeOcrRow(${idx})" class="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50"><i class="fa-solid fa-trash-can"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function addOcrRow() {
+            currentOcrMedicines.push({
+                medicine_name: 'Thuốc mới',
+                dosage: '1 viên',
+                schedule_times: ['08:00'],
+                instructions: 'Uống sau ăn',
+                pill_color_shape: 'Viên thuốc tròn'
+            });
+            renderOcrRows();
+        }
+
+        function removeOcrRow(idx) {
+            currentOcrMedicines.splice(idx, 1);
+            renderOcrRows();
+        }
+
+        async function saveOcrMedications() {
+            if (!currentOcrMedicines || currentOcrMedicines.length === 0) {
+                alert('Không có thuốc nào trong danh sách.');
+                return;
+            }
+
+            const medicationsToSave = [];
+            for (let i = 0; i < currentOcrMedicines.length; i++) {
+                const nameEl = document.getElementById(`ocr_name_${i}`);
+                const doseEl = document.getElementById(`ocr_dose_${i}`);
+                const timesEl = document.getElementById(`ocr_times_${i}`);
+                const instEl = document.getElementById(`ocr_inst_${i}`);
+
+                if (!nameEl || !nameEl.value.trim()) continue;
+
+                const timesArr = (timesEl ? timesEl.value : '08:00')
+                    .split(',')
+                    .map(t => t.trim())
+                    .filter(t => t.length > 0);
+
+                medicationsToSave.push({
+                    elderly_id: elderlyId,
+                    medicine_name: nameEl.value.trim(),
+                    dosage: doseEl ? doseEl.value.trim() : '1 viên',
+                    instructions: instEl ? instEl.value.trim() : 'Uống sau ăn',
+                    schedule_times: timesArr.length > 0 ? timesArr : ['08:00'],
+                    pill_color_shape: 'Viên thuốc'
+                });
+            }
+
+            if (medicationsToSave.length === 0) {
+                alert('Vui lòng nhập tên thuốc hợp lệ.');
+                return;
+            }
+
+            const btnSave = document.getElementById('btnSaveOcr');
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang lưu...';
+
+            try {
+                const res = await fetch(`${API_BASE}/family/${elderlyId}/prescriptions/batch-create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        medications: medicationsToSave,
+                        raw_ocr_text: document.getElementById('ocrTextInput').value.trim() || 'Ảnh đơn thuốc'
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(`✅ ${data.message}`);
+                    toggleOcrModal(false);
+                    document.getElementById('ocrTextInput').value = '';
+                    document.getElementById('ocrFileInput').value = '';
+                    document.getElementById('ocrResultSection').classList.add('hidden');
+                    currentOcrMedicines = [];
+                    loadDashboardData();
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Lỗi khi lưu đơn thuốc.');
+                }
+            } catch (err) {
+                console.error('Save OCR Error:', err);
+                alert('Lỗi kết nối khi lưu đơn thuốc.');
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Xác nhận & Lưu vào lịch uống của Cụ';
             }
         }
 
