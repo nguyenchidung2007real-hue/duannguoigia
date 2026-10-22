@@ -77,3 +77,18 @@ class QrAlertRequest(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     helper_note: Optional[str] = None
+
+# Schema Quản lý Danh bạ Khẩn cấp Người thân
+class EmergencyContactCreate(BaseModel):
+    full_name: str
+    phone_number: str
+    relationship_type: str = "CON_GAI"
+    is_primary_contact: bool = False
+
+class EmergencyContactResponse(EmergencyContactCreate):
+    id: str
+    elderly_id: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

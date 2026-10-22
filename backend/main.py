@@ -1193,6 +1193,99 @@ def get_family_medications(elderly_id: str, db: Session = Depends(get_db)):
     ]
 
 
+@app.get(
+    "/api/family/{elderly_id}/contacts",
+    response_model=List[schemas.EmergencyContactResponse],
+)
+def get_emergency_contacts(elderly_id: str, db: Session = Depends(get_db)):
+    contacts = (
+        db.query(models.FamilyMember)
+        .filter(models.FamilyMember.elderly_id == elderly_id)
+        .order_by(
+            models.FamilyMember.is_primary_contact.desc(),
+            models.FamilyMember.created_at.asc(),
+        )
+        .all()
+    )
+    return contacts
+
+
+@app.post(
+    "/api/family/{elderly_id}/contacts",
+    response_model=schemas.EmergencyContactResponse,
+)
+def add_emergency_contact(
+    elderly_id: str,
+    contact_in: schemas.EmergencyContactCreate,
+    db: Session = Depends(get_db),
+):
+    profile = (
+        db.query(models.ElderlyProfile)
+        .filter(models.ElderlyProfile.id == elderly_id)
+        .first()
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=404, detail="Không tìm thấy hồ sơ người cao tuổi"
+        )
+
+    clean_phone = re.sub(r"\s+", "", contact_in.phone_number)
+    if not re.match(r"^0\d{9,10}$", clean_phone):
+        raise HTTPException(
+            status_code=422,
+            detail="Số điện thoại không hợp lệ (Phải bắt đầu bằng số 0 và có 10-11 chữ số).",
+        )
+
+    if contact_in.is_primary_contact:
+        db.query(models.FamilyMember).filter(
+            models.FamilyMember.elderly_id == elderly_id
+        ).update({"is_primary_contact": False})
+
+    new_contact = models.FamilyMember(
+        elderly_id=elderly_id,
+        full_name=contact_in.full_name.strip(),
+        phone_number=clean_phone,
+        relationship_type=contact_in.relationship_type,
+        is_primary_contact=contact_in.is_primary_contact,
+    )
+    db.add(new_contact)
+    db.commit()
+    db.refresh(new_contact)
+    return new_contact
+
+
+@app.delete("/api/family/{elderly_id}/contacts/{contact_id}")
+def delete_emergency_contact(
+    elderly_id: str, contact_id: str, db: Session = Depends(get_db)
+):
+    contact = (
+        db.query(models.FamilyMember)
+        .filter(
+            models.FamilyMember.id == contact_id,
+            models.FamilyMember.elderly_id == elderly_id,
+        )
+        .first()
+    )
+    if not contact:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy người liên hệ của người cao tuổi này",
+        )
+
+    if contact.is_primary_contact:
+        raise HTTPException(
+            status_code=400,
+            detail="Không thể xóa người liên hệ chính duy nhất. Vui lòng chỉ định người khác làm liên hệ chính trước.",
+        )
+
+    db.delete(contact)
+    db.commit()
+    return {
+        "success": True,
+        "message": f"Đã xóa liên hệ {contact.full_name} khỏi danh bạ khẩn cấp.",
+    }
+
+
 @app.get("/api/family/summary/{elderly_id}")
 def get_family_summary(elderly_id: str, db: Session = Depends(get_db)):
     profile = (
